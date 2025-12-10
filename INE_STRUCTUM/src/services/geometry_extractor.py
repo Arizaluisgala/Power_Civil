@@ -129,10 +129,10 @@ class GeometryExtractor:
             return members
     
     def _extract_physical_members(self, model: StructuralModel) -> Dict[int, PhysicalMember]:
-        '''
+        """
         Extraer PHYSICAL MEMBERS completos
         ESTA ES LA FUNCION CLAVE PARA TU WORKFLOW
-        '''
+        """
         physical_members = {}
         
         try:
@@ -145,25 +145,39 @@ class GeometryExtractor:
             
             self.logger.info(f"  Procesando {pm_count} Physical Members...")
             
-            # Obtener IDs de todos los PMs
-            pm_list_array = []
-            self.staad.Geometry.GetPhysicalMemberList(pm_list_array)
-            pm_list = list(pm_list_array)
+            # CORREGIDO: GetPhysicalMemberList() retorna directamente la lista
+            try:
+                pm_list = self.staad.Geometry.GetPhysicalMemberList()
+                # Si retorna None o vacío, crear rango basado en count
+                if not pm_list:
+                    pm_list = list(range(1, pm_count + 1))
+            except Exception as e:
+                self.logger.warning(f"    GetPhysicalMemberList falló: {e}")
+                # Fallback: generar lista secuencial
+                pm_list = list(range(1, pm_count + 1))
             
             for idx, pm_id in enumerate(pm_list, 1):
                 if idx % 10 == 0:
                     self.logger.info(f"    Progreso: {idx}/{len(pm_list)}")
                 
                 try:
-                    # Obtener miembros analiticos del PM
-                    am_count = self.staad.Geometry.GetAnalyticalMemberCountForPhysicalMember(pm_id)
+                    # Obtener miembros analíticos del PM - CORREGIDO: sin argumentos
+                    am_list = self.staad.Geometry.GetAnalyticalMembersForPhysicalMember(pm_id)
                     
-                    am_list_array = []
-                    self.staad.Geometry.GetAnalyticalMembersForPhysicalMember(pm_id, am_list_array)
-                    am_list = list(am_list_array)
+                    # Convertir a lista si es necesario
+                    if not isinstance(am_list, list):
+                        am_list = list(am_list) if am_list else []
+                    
+                    if not am_list:
+                        self.logger.warning(f"    PM {pm_id} no tiene miembros analíticos")
+                        continue
                     
                     # Calcular longitud total y nodos extremos
-                    total_length = sum(model.members[am_id].length for am_id in am_list if am_id in model.members)
+                    total_length = sum(
+                        model.members[am_id].length 
+                        for am_id in am_list 
+                        if am_id in model.members
+                    )
                     
                     # Ordenar nodos (similar a tu VBA)
                     ordered_nodes = self._order_pm_nodes(am_list, model.members)
@@ -181,6 +195,11 @@ class GeometryExtractor:
                         ordered_nodes=ordered_nodes
                     )
                     
+                    # Asignar PM a los miembros analíticos
+                    for am_id in am_list:
+                        if am_id in model.members:
+                            model.members[am_id].physical_member_id = pm_id
+                    
                 except Exception as e:
                     self.logger.warning(f"    Error procesando PM {pm_id}: {str(e)}")
                     continue
@@ -189,19 +208,17 @@ class GeometryExtractor:
             
         except Exception as e:
             self.logger.error(f"Error extrayendo Physical Members: {str(e)}")
+            import traceback
+            self.logger.error(traceback.format_exc())
             return physical_members
     
     def _order_pm_nodes(self, am_list: List[int], members: Dict[int, AnalyticalMember]) -> List[int]:
-        '''
-        Ordenar nodos de Physical Member
-        Similar a tu logica VBA de ordenamiento
-        '''
+        '''Ordenar nodos de Physical Member'''
         if not am_list:
             return []
         
-        # Recolectar todos los nodos
         nodes_set = set()
-        connections = {}  # node -> [connected_nodes]
+        connections = {}
         
         for am_id in am_list:
             if am_id not in members:
@@ -221,10 +238,8 @@ class GeometryExtractor:
             connections[node_a].append(node_b)
             connections[node_b].append(node_a)
         
-        # Encontrar nodo inicial (con menos conexiones, tipicamente extremo)
         start_node = min(nodes_set, key=lambda n: len(connections.get(n, [])))
         
-        # Ordenar desde el inicio
         ordered = [start_node]
         visited = {start_node}
         
@@ -300,7 +315,6 @@ class GeometryExtractor:
             vertical_threshold = 0.8
             horizontal_threshold = 0.15
             
-            # Clasificar
             if abs(dy_norm) > vertical_threshold:
                 groups["_COLUMNAS_PRIN"].append(member_id)
                 member.group = "_COLUMNAS_PRIN"
@@ -331,7 +345,7 @@ class GeometryExtractor:
         
         classified = sum(1 for m in model.members.values() if m.member_type != MemberType.UNKNOWN)
         
-        self.logger.info(f"  Clasificados: {classified}")
+        self.logger.info(f"  Clasificados: {classified}/{len(model.members)} miembros")
     
     def _print_statistics(self, model: StructuralModel):
         '''Estadisticas completas'''
@@ -342,7 +356,6 @@ class GeometryExtractor:
         self.logger.info(f"  Physical Members: {len(model.physical_members)}")
         self.logger.info(f"  Grupos: {len(model.groups)}")
         
-        # Miembros por tipo
         type_counts = {}
         for member in model.members.values():
             tipo = member.member_type
@@ -353,7 +366,6 @@ class GeometryExtractor:
             if count > 0:
                 self.logger.info(f"  {tipo.value}: {count}")
         
-        # Verificaciones requeridas
         deflection_members = len([m for m in model.members.values() 
                                 if m.member_type.requires_deflection_check()])
         drift_members = len([m for m in model.members.values() 
@@ -363,8 +375,7 @@ class GeometryExtractor:
         self.logger.info(f"  Deflexion: {deflection_members} miembros")
         self.logger.info(f"  Deriva: {drift_members} miembros")
         
-        # Estadisticas de PMs
         if model.physical_members:
-            avg_am_per_pm = np.mean([len(pm.analytical_members) for pm.analytical_members in model.physical_members.values()])
+            avg_am_per_pm = np.mean([len(pm.analytical_members) for pm in model.physical_members.values()])
             self.logger.info(f"\nPHYSICAL MEMBERS:")
             self.logger.info(f"  Promedio AMs por PM: {avg_am_per_pm:.1f}")
