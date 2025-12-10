@@ -1,7 +1,7 @@
 ﻿"""
 Extractor de geometria del modelo STAAD.Pro
 CON SOPORTE COMPLETO DE PHYSICAL MEMBERS Y GRUPOS
-VERSION CORREGIDA
+VERSION FINAL - RECONOCE TODOS LOS TIPOS DE GRUPOS
 """
 
 import logging
@@ -18,6 +18,7 @@ class GeometryExtractor:
     """
     Extrae geometria completa del modelo STAAD
     Incluye Physical Members y clasificacion por grupos
+    RECONOCE GRUPOS EN TODOS LOS TIPOS (Member, Node, Plate)
     """
     
     def __init__(self, connector: STAADConnector):
@@ -47,12 +48,12 @@ class GeometryExtractor:
         model.members = self._extract_members()
         self.logger.info(f"Extraidos: {len(model.members)} miembros")
         
-        # PASO 3: Extraer PHYSICAL MEMBERS (CORREGIDO)
+        # PASO 3: Extraer PHYSICAL MEMBERS
         self.logger.info("\n[3/6] Extrayendo Physical Members...")
         model.physical_members = self._extract_physical_members(model)
         self.logger.info(f"Extraidos: {len(model.physical_members)} Physical Members")
         
-        # PASO 4: Extraer grupos (CORREGIDO)
+        # PASO 4: Extraer grupos (BUSCA EN TODOS LOS TIPOS)
         self.logger.info("\n[4/6] Extrayendo grupos desde STAAD...")
         model.groups = self._extract_groups()
         
@@ -258,28 +259,49 @@ class GeometryExtractor:
         return ordered
     
     def _extract_groups(self) -> Dict[str, List[int]]:
-        """Extraer grupos usando funcion corregida"""
+        """
+        Extraer grupos usando funcion corregida
+        BUSCA EN TODOS LOS TIPOS: Member (0), Node (1), Plate (2)
+        """
         groups = {}
         
         try:
-            # USAR FUNCION CORREGIDA para obtener nombres de grupos de miembros
-            group_names = geo_ext.GetGroupNames(self.staad.Geometry, grouptype=0)
-            
-            if not group_names:
-                self.logger.warning("  No se encontraron grupos de miembros")
-                return groups
-            
-            for group_name in group_names:
+            # BUSCAR EN LOS 3 TIPOS DE GRUPOS
+            for group_type, type_name in [(0, "Member"), (1, "Node"), (2, "Plate")]:
                 try:
-                    # USAR FUNCION CORREGIDA para obtener miembros del grupo
-                    members = geo_ext.GetGroupEntities(self.staad.Geometry, group_name)
+                    group_names = geo_ext.GetGroupNames(self.staad.Geometry, grouptype=group_type)
                     
-                    if members:
-                        groups[group_name] = members
-                        self.logger.info(f"  Grupo '{group_name}': {len(members)} miembros")
-                        
+                    if not group_names:
+                        self.logger.debug(f"  Tipo {type_name}: 0 grupos")
+                        continue
+                    
+                    self.logger.info(f"  Tipo {type_name}: {len(group_names)} grupos encontrados")
+                    
+                    for group_name in group_names:
+                        try:
+                            entities = geo_ext.GetGroupEntities(self.staad.Geometry, group_name)
+                            
+                            if not entities:
+                                continue
+                            
+                            # Verificar que los IDs sean miembros validos (no nodos ni placas)
+                            valid_members = [e for e in entities if e in self.staad.Geometry.GetBeamList()]
+                            
+                            if valid_members:
+                                # Si ya existe el grupo, combinar entidades
+                                if group_name in groups:
+                                    groups[group_name].extend(valid_members)
+                                    groups[group_name] = list(set(groups[group_name]))  # Eliminar duplicados
+                                else:
+                                    groups[group_name] = valid_members
+                                
+                                self.logger.info(f"    Grupo '{group_name}': {len(valid_members)} miembros")
+                                    
+                        except Exception as e:
+                            self.logger.debug(f"    Error en grupo '{group_name}': {e}")
+                            
                 except Exception as e:
-                    self.logger.debug(f"  Error en grupo '{group_name}': {e}")
+                    self.logger.debug(f"  Error en tipo {type_name}: {e}")
             
             return groups
             
