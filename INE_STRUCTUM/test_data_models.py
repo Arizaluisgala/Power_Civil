@@ -7,7 +7,8 @@ print("="*60 + "\n")
 try:
     from src.models.data_models import (
         Node, AnalyticalMember, StructuralModel,
-        MemberType, LoadType, NormType
+        MemberType, LoadType, NormType,
+        AnalysisParameters, ProjectInfo  # AGREGADO
     )
     print("OK - Todos los modelos importados\n")
     
@@ -90,8 +91,11 @@ try:
         print(f"      {member_type.value}: L/{limit}")
     
     print("\n" + "="*60)
-    print("TODOS LOS TESTS PASARON")
+    print("TODOS LOS TESTS PASARON EXITOSAMENTE")
     print("="*60 + "\n")
+    
+    print("SIGUIENTE PASO:")
+    print("   Crear geometry_extractor.py para extraer geometria de STAAD.Pro\n")
     
 except Exception as e:
     print(f"\nERROR: {e}")
