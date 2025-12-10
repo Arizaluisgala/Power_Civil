@@ -1,6 +1,7 @@
 ﻿"""
 Extractor de geometria del modelo STAAD.Pro
 CON SOPORTE COMPLETO DE PHYSICAL MEMBERS Y GRUPOS
+VERSION CORREGIDA
 """
 
 import logging
@@ -11,12 +12,13 @@ from src.models.data_models import (
     StructuralModel, MemberType
 )
 from src.services.staad_connector import STAADConnector
+from src.services import geometry_extensions as geo_ext
 
 class GeometryExtractor:
-    '''
+    """
     Extrae geometria completa del modelo STAAD
     Incluye Physical Members y clasificacion por grupos
-    '''
+    """
     
     def __init__(self, connector: STAADConnector):
         if not connector.is_connected:
@@ -27,7 +29,7 @@ class GeometryExtractor:
         self.conversion_factor = connector.get_conversion_factor_to_mm()
     
     def extract_complete_model(self) -> StructuralModel:
-        '''Extraccion completa de geometria CON PHYSICAL MEMBERS'''
+        """Extraccion completa de geometria CON PHYSICAL MEMBERS"""
         
         self.logger.info("="*60)
         self.logger.info("INICIANDO EXTRACCION COMPLETA DE GEOMETRIA")
@@ -45,21 +47,20 @@ class GeometryExtractor:
         model.members = self._extract_members()
         self.logger.info(f"Extraidos: {len(model.members)} miembros")
         
-        # PASO 3: Extraer PHYSICAL MEMBERS (CRITICO)
+        # PASO 3: Extraer PHYSICAL MEMBERS (CORREGIDO)
         self.logger.info("\n[3/6] Extrayendo Physical Members...")
         model.physical_members = self._extract_physical_members(model)
         self.logger.info(f"Extraidos: {len(model.physical_members)} Physical Members")
         
-        # PASO 4: Extraer grupos (fallback si no disponible)
-        self.logger.info("\n[4/6] Intentando extraer grupos desde STAAD...")
-        groups_from_staad = self._extract_groups_safe()
+        # PASO 4: Extraer grupos (CORREGIDO)
+        self.logger.info("\n[4/6] Extrayendo grupos desde STAAD...")
+        model.groups = self._extract_groups()
         
-        if len(groups_from_staad) > 1 or list(groups_from_staad.keys())[0] != "_DESCONOCIDO":
-            model.groups = groups_from_staad
+        if len(model.groups) > 0:
             self.logger.info(f"Extraidos: {len(model.groups)} grupos desde STAAD")
             self._classify_members_from_groups(model)
         else:
-            self.logger.warning("No se pudieron extraer grupos desde STAAD")
+            self.logger.warning("No se encontraron grupos, usando clasificacion geometrica...")
             self.logger.info("\n[5/6] Clasificando por GEOMETRIA (fallback)...")
             model.groups = self._classify_by_geometry(model)
             self.logger.info(f"Creados: {len(model.groups)} grupos por geometria")
@@ -69,13 +70,13 @@ class GeometryExtractor:
         self._print_statistics(model)
         
         self.logger.info("\n" + "="*60)
-        self.logger.info("EXTRACCION COMPLETADA")
+        self.logger.info("EXTRACCION COMPLETADA EXITOSAMENTE")
         self.logger.info("="*60)
         
         return model
     
     def _extract_nodes(self) -> Dict[int, Node]:
-        '''Extraer todos los nodos'''
+        """Extraer todos los nodos"""
         nodes = {}
         
         try:
@@ -98,7 +99,7 @@ class GeometryExtractor:
             return nodes
     
     def _extract_members(self) -> Dict[int, AnalyticalMember]:
-        '''Extraer miembros analiticos'''
+        """Extraer miembros analiticos"""
         members = {}
         
         try:
@@ -130,30 +131,24 @@ class GeometryExtractor:
     
     def _extract_physical_members(self, model: StructuralModel) -> Dict[int, PhysicalMember]:
         """
-        Extraer PHYSICAL MEMBERS completos
-        ESTA ES LA FUNCION CLAVE PARA TU WORKFLOW
+        Extraer PHYSICAL MEMBERS usando funciones corregidas
         """
         physical_members = {}
         
         try:
-            # Obtener lista de Physical Members
             pm_count = self.staad.Geometry.GetPhysicalMemberCount()
             
             if pm_count == 0:
-                self.logger.warning("  No hay Physical Members definidos en el modelo")
+                self.logger.warning("  No hay Physical Members definidos")
                 return physical_members
             
             self.logger.info(f"  Procesando {pm_count} Physical Members...")
             
-            # CORREGIDO: GetPhysicalMemberList() retorna directamente la lista
-            try:
-                pm_list = self.staad.Geometry.GetPhysicalMemberList()
-                # Si retorna None o vacío, crear rango basado en count
-                if not pm_list:
-                    pm_list = list(range(1, pm_count + 1))
-            except Exception as e:
-                self.logger.warning(f"    GetPhysicalMemberList falló: {e}")
-                # Fallback: generar lista secuencial
+            # USAR FUNCION CORREGIDA
+            pm_list = geo_ext.GetPhysicalMemberList(self.staad.Geometry)
+            
+            if not pm_list:
+                self.logger.warning("  GetPhysicalMemberList retorno lista vacia")
                 pm_list = list(range(1, pm_count + 1))
             
             for idx, pm_id in enumerate(pm_list, 1):
@@ -161,29 +156,31 @@ class GeometryExtractor:
                     self.logger.info(f"    Progreso: {idx}/{len(pm_list)}")
                 
                 try:
-                    # Obtener miembros analíticos del PM - CORREGIDO: sin argumentos
-                    am_list = self.staad.Geometry.GetAnalyticalMembersForPhysicalMember(pm_id)
-                    
-                    # Convertir a lista si es necesario
-                    if not isinstance(am_list, list):
-                        am_list = list(am_list) if am_list else []
-                    
-                    if not am_list:
-                        self.logger.warning(f"    PM {pm_id} no tiene miembros analíticos")
-                        continue
-                    
-                    # Calcular longitud total y nodos extremos
-                    total_length = sum(
-                        model.members[am_id].length 
-                        for am_id in am_list 
-                        if am_id in model.members
+                    # USAR FUNCION CORREGIDA
+                    am_list = geo_ext.GetAnalyticalMembersForPhysicalMember(
+                        self.staad.Geometry, pm_id
                     )
                     
-                    # Ordenar nodos (similar a tu VBA)
+                    if not am_list:
+                        continue
+                    
+                    # Filtrar IDs validos
+                    am_list = [am_id for am_id in am_list if am_id in model.members and am_id != 0]
+                    
+                    if not am_list:
+                        continue
+                    
+                    # Calcular longitud total
+                    total_length = sum(model.members[am_id].length for am_id in am_list)
+                    
+                    # Ordenar nodos
                     ordered_nodes = self._order_pm_nodes(am_list, model.members)
                     
-                    start_node = ordered_nodes[0] if ordered_nodes else 0
-                    end_node = ordered_nodes[-1] if ordered_nodes else 0
+                    if not ordered_nodes:
+                        continue
+                    
+                    start_node = ordered_nodes[0]
+                    end_node = ordered_nodes[-1]
                     
                     # Crear Physical Member
                     physical_members[pm_id] = PhysicalMember(
@@ -195,13 +192,12 @@ class GeometryExtractor:
                         ordered_nodes=ordered_nodes
                     )
                     
-                    # Asignar PM a los miembros analíticos
+                    # Asignar PM ID a miembros analiticos
                     for am_id in am_list:
-                        if am_id in model.members:
-                            model.members[am_id].physical_member_id = pm_id
+                        model.members[am_id].physical_member_id = pm_id
                     
                 except Exception as e:
-                    self.logger.warning(f"    Error procesando PM {pm_id}: {str(e)}")
+                    self.logger.debug(f"    Error en PM {pm_id}: {str(e)}")
                     continue
             
             return physical_members
@@ -213,7 +209,7 @@ class GeometryExtractor:
             return physical_members
     
     def _order_pm_nodes(self, am_list: List[int], members: Dict[int, AnalyticalMember]) -> List[int]:
-        '''Ordenar nodos de Physical Member'''
+        """Ordenar nodos de Physical Member"""
         if not am_list:
             return []
         
@@ -238,6 +234,10 @@ class GeometryExtractor:
             connections[node_a].append(node_b)
             connections[node_b].append(node_a)
         
+        if not nodes_set:
+            return []
+        
+        # Encontrar nodo inicial (extremo)
         start_node = min(nodes_set, key=lambda n: len(connections.get(n, [])))
         
         ordered = [start_node]
@@ -257,32 +257,38 @@ class GeometryExtractor:
         
         return ordered
     
-    def _extract_groups_safe(self) -> Dict[str, List[int]]:
-        '''Extraer grupos (con fallback)'''
+    def _extract_groups(self) -> Dict[str, List[int]]:
+        """Extraer grupos usando funcion corregida"""
         groups = {}
         
         try:
-            if hasattr(self.staad.Geometry, 'GetGroupList'):
-                group_list = self.staad.Geometry.GetGroupList()
-                
-                for group_name in group_list:
-                    try:
-                        members = self.staad.Geometry.GetGroupMemberList(group_name)
-                        groups[group_name] = list(members)
+            # USAR FUNCION CORREGIDA para obtener nombres de grupos de miembros
+            group_names = geo_ext.GetGroupNames(self.staad.Geometry, grouptype=0)
+            
+            if not group_names:
+                self.logger.warning("  No se encontraron grupos de miembros")
+                return groups
+            
+            for group_name in group_names:
+                try:
+                    # USAR FUNCION CORREGIDA para obtener miembros del grupo
+                    members = geo_ext.GetGroupEntities(self.staad.Geometry, group_name)
+                    
+                    if members:
+                        groups[group_name] = members
                         self.logger.info(f"  Grupo '{group_name}': {len(members)} miembros")
-                    except:
-                        pass
-            else:
-                groups["_DESCONOCIDO"] = []
+                        
+                except Exception as e:
+                    self.logger.debug(f"  Error en grupo '{group_name}': {e}")
             
             return groups
             
         except Exception as e:
-            self.logger.warning(f"  No se pudieron extraer grupos: {str(e)}")
-            return {"_DESCONOCIDO": []}
+            self.logger.warning(f"  Error extrayendo grupos: {str(e)}")
+            return groups
     
     def _classify_by_geometry(self, model: StructuralModel) -> Dict[str, List[int]]:
-        '''Clasificar por geometria (fallback)'''
+        """Clasificar por geometria (fallback)"""
         
         self.logger.info("  Analizando orientacion de miembros...")
         
@@ -335,7 +341,7 @@ class GeometryExtractor:
         return groups
     
     def _classify_members_from_groups(self, model: StructuralModel):
-        '''Clasificar miembros desde grupos de STAAD'''
+        """Clasificar miembros desde grupos de STAAD"""
         
         for group_name, member_ids in model.groups.items():
             for member_id in member_ids:
@@ -348,7 +354,7 @@ class GeometryExtractor:
         self.logger.info(f"  Clasificados: {classified}/{len(model.members)} miembros")
     
     def _print_statistics(self, model: StructuralModel):
-        '''Estadisticas completas'''
+        """Estadisticas completas"""
         
         self.logger.info("\nESTADISTICAS DEL MODELO:")
         self.logger.info(f"  Nodos: {len(model.nodes)}")
