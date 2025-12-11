@@ -1,0 +1,33 @@
+# Core
+python-dateutil==2.9.0
+pytz==2024.1
+
+# Database
+sqlalchemy==2.0.36
+alembic==1.14.0
+
+# STAAD Integration
+pythonnet==3.0.5
+comtypes==1.4.9
+
+# UI
+customtkinter==5.2.2
+pillow==11.0.0
+
+# Reports
+reportlab==4.2.5
+python-docx==1.1.2
+openpyxl==3.1.5
+
+# Utilities
+python-dotenv==1.0.1
+loguru==0.7.3
+
+# Testing
+pytest==8.3.4
+pytest-cov==6.0.0
+
+# Development
+black==24.10.0
+flake8==7.1.1
+mypy==1.13.0
