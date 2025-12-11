@@ -21,7 +21,7 @@ def main(page: ft.Page):
     logo_structum_path = "assets/logo_structum.png"
     
     def on_exit(e):
-        page.window_destroy()
+        page.window.destroy()
     
     # ==================== HEADER ====================
     header = ft.Container(
@@ -131,3 +131,5 @@ def main(page: ft.Page):
 
 if __name__ == "__main__":
     ft.app(target=main, assets_dir="assets")
+
+

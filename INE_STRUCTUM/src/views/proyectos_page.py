@@ -477,10 +477,23 @@ class ProyectosPage:
         self.page.update()
     
     def select_format_file(self, e):
+        """Abre diálogo para seleccionar archivo de plantilla"""
         self.form_modified = True
-        self.archivo_formato.value = "✅ Plantilla_Inelectra_2025.xlsx"
-        self.archivo_formato.color = "#10b981"
+        
+        def on_file_selected(e: ft.FilePickerResultEvent):
+            if e.files:
+                self.archivo_formato.value = f"✅ {e.files[0].name}"
+                self.archivo_formato.color = "#10b981"
+                self.page.update()
+        
+        file_picker = ft.FilePicker(on_result=on_file_selected)
+        self.page.overlay.append(file_picker)
         self.page.update()
+        file_picker.pick_files(
+            dialog_title="Seleccionar plantilla Excel/Word",
+            allowed_extensions=["xlsx", "xls", "docx", "doc"],
+            allow_multiple=False
+        )
     
     def save_project_final(self, e):
         if not self.input_nombre.value:
@@ -532,6 +545,7 @@ class ProyectosPage:
         self.page.overlay.append(snack)
         snack.open = True
         self.page.update()
+
 
 
 

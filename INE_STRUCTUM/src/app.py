@@ -74,8 +74,7 @@ class INEStructumApp:
                         self.main_content
                     ],
                     expand=True,
-                    spacing=0,
-                    vertical_alignment=ft.CrossAxisAlignment.STRETCH
+                    spacing=0
                 ),
                 self.create_footer()
             ],
@@ -88,17 +87,26 @@ class INEStructumApp:
         return ft.Container(
             content=ft.Row(
                 [
-                    ft.Text(
-                        "🏗️ INE-STRUCTUM",
-                        size=24,
-                        weight=ft.FontWeight.BOLD,
-                        color="#FFFFFF"
-                    ),
-                    ft.Text(
-                        "v1.0.0 Beta",
-                        size=14,
+                    ft.Row([
+                        ft.Text(
+                            "🏗️ INE-STRUCTUM",
+                            size=24,
+                            weight=ft.FontWeight.BOLD,
+                            color="#FFFFFF"
+                        ),
+                        ft.Text(
+                            "v1.0.0 Beta",
+                            size=14,
+                            color="#FFFFFF",
+                            opacity=0.8
+                        )
+                    ], spacing=10),
+                    ft.ElevatedButton(
+                        "Salir",
+                        icon=ft.Icons.EXIT_TO_APP,
+                        bgcolor="#dc2626",
                         color="#FFFFFF",
-                        opacity=0.8
+                        on_click=lambda _: self.page.window_close()
                     )
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN
@@ -110,10 +118,10 @@ class INEStructumApp:
     def create_sidebar(self):
         """Crea el menú lateral de navegación"""
         menu_items = []
-        
+
         for section_id, section_info in self.sections.items():
             is_active = section_id == self.current_section
-            
+
             menu_item = ft.Container(
                 content=ft.Row(
                     [
@@ -133,29 +141,29 @@ class INEStructumApp:
                 ink=True,
                 on_click=lambda e, sid=section_id: self.change_section(sid)
             )
-            
+
             menu_items.append(menu_item)
         
         return ft.Container(
             content=ft.Column(
-                [
-                    ft.Container(expand=True),  # Espaciador superior
-                    ft.Column(menu_items, spacing=5),
-                    ft.Container(expand=True),  # Espaciador inferior
+                controls=[
+                    ft.Container(expand=True),  # Espaciador arriba
+                    *menu_items,  # Botones del menú
+                    ft.Container(expand=True),  # Espaciador abajo
                 ],
-                expand=True,
-                alignment=ft.MainAxisAlignment.CENTER
+                spacing=5
             ),
-            width=250,width=250,
+            width=250,
             bgcolor=self.colors['surface'],
-            padding=10,            expand=True,
+            padding=10,
+            expand=True,
             shadow=ft.BoxShadow(
                 spread_radius=1,
                 blur_radius=10,
                 color="#00000010"
             )
         )
-    
+
     def create_footer(self):
         """Crea el footer de la aplicación"""
         return ft.Container(
@@ -285,6 +293,15 @@ class INEStructumApp:
             ],
             scroll=ft.ScrollMode.AUTO
         )
+
+
+
+
+
+
+
+
+
 
 
 
