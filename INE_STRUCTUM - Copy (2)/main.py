@@ -27,18 +27,7 @@ def main(page: ft.Page):
     header = ft.Container(
         content=ft.Row([
             ft.Container(
-                content=ft.Container(
-                    content=ft.Image(src=logo_structum_path, width=45, height=45, fit=ft.ImageFit.CONTAIN) if os.path.exists(logo_structum_path) else ft.Text("🏗️", size=35),
-                    width=62,
-                    height=62,
-                    gradient=ft.RadialGradient(
-                        center=ft.Alignment(0, 0),
-                        radius=1.2,
-                        colors=["#0c1e47", "#1e3a8a", "#3b82f6", "#93c5fd"]
-                    ),
-                    border_radius=31,  # Círculo perfecto
-                    alignment=ft.alignment.center
-                ),
+                content=ft.Image(src=logo_structum_path, width=45, height=45, fit=ft.ImageFit.CONTAIN) if os.path.exists(logo_structum_path) else ft.Text("🏗️", size=35),
                 padding=ft.padding.only(left=15, right=10)
             ),
             ft.Text("INE-STRUCTUM", size=24, weight=ft.FontWeight.BOLD, color="#ffffff"),
@@ -46,7 +35,7 @@ def main(page: ft.Page):
             ft.ElevatedButton("Salir", icon=ft.Icons.LOGOUT, on_click=on_exit, bgcolor="#ef4444", color="#ffffff", style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))),
             ft.Container(width=15),
         ], alignment=ft.MainAxisAlignment.START),
-        gradient=ft.LinearGradient(begin=ft.alignment.center_left, end=ft.alignment.center_right, colors=["#0c1e47", "#1e3a8a", "#3b82f6", "#93c5fd"]),
+        gradient=ft.LinearGradient(begin=ft.alignment.center_left, end=ft.alignment.center_right, colors=["#1e3a8a", "#2563eb", "#3b82f6", "#60a5fa"]),
         padding=15,
         shadow=ft.BoxShadow(spread_radius=0, blur_radius=10, color="#00000020", offset=ft.Offset(0, 2))
     )
@@ -147,24 +136,6 @@ def main(page: ft.Page):
 
 if __name__ == "__main__":
     ft.app(target=main, assets_dir="assets")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

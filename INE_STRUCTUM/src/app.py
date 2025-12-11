@@ -8,6 +8,7 @@ Versión: 1.0.0 Beta
 """
 
 import flet as ft
+from datetime import datetime
 from src.views.proyectos_page import ProyectosPage
 
 
@@ -46,7 +47,7 @@ class INEStructumApp:
         self.page = page
         
         # Configurar ventana principal
-        page.title = "INE-STRUCTUM v1.0.0"
+        page.title = "🔴 CAMBIO APLICADO - SIDEBAR CENTRADO 🔴"
         page.window.width = 1280
         page.window.height = 800
         page.window.min_width = 1024
@@ -68,13 +69,15 @@ class INEStructumApp:
         return ft.Column(
             [
                 self.create_header(),
-                ft.Row(
-                    [
-                        self.create_sidebar(),
-                        self.main_content
-                    ],
-                    expand=True,
-                    spacing=0
+                ft.Container(
+                    content=ft.Row(
+                        [
+                            self.create_sidebar(),
+                            self.main_content
+                        ],
+                        spacing=0
+                    ),
+                    expand=True
                 ),
                 self.create_footer()
             ],
@@ -95,7 +98,7 @@ class INEStructumApp:
                             color="#FFFFFF"
                         ),
                         ft.Text(
-                            "v1.0.0 Beta",
+                            "v1.0.0 Beta - " + datetime.now().strftime("%H:%M:%S"),
                             size=14,
                             color="#FFFFFF",
                             opacity=0.8
@@ -146,17 +149,15 @@ class INEStructumApp:
         
         return ft.Container(
             content=ft.Column(
-                controls=[
-                    ft.Container(expand=True),  # Espaciador arriba
-                    *menu_items,  # Botones del menú
-                    ft.Container(expand=True),  # Espaciador abajo
-                ],
-                spacing=5
+                menu_items,
+                spacing=5,
+                tight=True
             ),
             width=250,
             bgcolor=self.colors['surface'],
             padding=10,
             expand=True,
+            alignment=ft.alignment.center,
             shadow=ft.BoxShadow(
                 spread_radius=1,
                 blur_radius=10,
@@ -173,7 +174,7 @@ class INEStructumApp:
                 color="#6B7280",
                 text_align=ft.TextAlign.CENTER
             ),
-            bgcolor=self.colors['surface'],
+            bgcolor='#FF0000',  # PRUEBA - DEBERÍA SER ROJO
             padding=10
         )
     
@@ -230,7 +231,7 @@ class INEStructumApp:
                         ],
                         spacing=10
                     ),
-                    bgcolor=self.colors['surface'],
+                    bgcolor='#FF0000',  # PRUEBA - DEBERÍA SER ROJO
                     padding=30,
                     border_radius=12,
                     shadow=ft.BoxShadow(spread_radius=1, blur_radius=10, color="#00000010")
@@ -293,6 +294,13 @@ class INEStructumApp:
             ],
             scroll=ft.ScrollMode.AUTO
         )
+
+
+
+
+
+
+
 
 
 
