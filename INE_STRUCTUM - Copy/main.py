@@ -1,6 +1,6 @@
 ﻿"""
 INE-STRUCTUM - Aplicación Principal
-VERSIÓN FINAL CORREGIDA
+VERSIÓN PROFESIONAL con layout centrado y márgenes proporcionales
 """
 
 import flet as ft
@@ -42,22 +42,44 @@ def main(page: ft.Page):
     
     # ==================== CONTENIDO ====================
     proyectos_view = ProyectosPage(page)
-    content_area = ft.Container(content=proyectos_view.build(), expand=True, bgcolor="#f8fafc")
+    
+    # Contenedor con ancho máximo y padding proporcional
+    content_wrapper = ft.Container(
+        content=ft.Container(
+            content=proyectos_view.build(),
+            bgcolor="#ffffff",
+            border_radius=12,
+            padding=30,
+            shadow=ft.BoxShadow(spread_radius=0, blur_radius=15, color="#00000010", offset=ft.Offset(0, 2))
+        ),
+        padding=ft.padding.symmetric(horizontal=40, vertical=30),
+        expand=True,
+        bgcolor="#f8fafc"
+    )
     
     # ==================== NAVEGACIÓN ====================
     def on_nav_change(e):
         idx = e.control.selected_index
         if idx == 0:
-            content_area.content = proyectos_view.build()
+            content_wrapper.content.content = proyectos_view.build()
         elif idx == 1:
-            content_area.content = ft.Text("Gestión de Productos - En desarrollo", size=20)
+            content_wrapper.content.content = ft.Container(
+                content=ft.Text("Gestión de Productos - En desarrollo", size=20, color="#64748b"),
+                padding=30
+            )
         elif idx == 2:
-            content_area.content = ft.Text("Análisis - En desarrollo", size=20)
+            content_wrapper.content.content = ft.Container(
+                content=ft.Text("Análisis - En desarrollo", size=20, color="#64748b"),
+                padding=30
+            )
         elif idx == 3:
-            content_area.content = ft.Text("Reportes - En desarrollo", size=20)
+            content_wrapper.content.content = ft.Container(
+                content=ft.Text("Reportes - En desarrollo", size=20, color="#64748b"),
+                padding=30
+            )
         page.update()
     
-    # NavigationRail simplificado
+    # NavigationRail
     nav_rail = ft.Container(
         content=ft.NavigationRail(
             selected_index=0,
@@ -75,7 +97,7 @@ def main(page: ft.Page):
         alignment=ft.alignment.top_center,
     )
     
-    # Copyright simplificado
+    # Copyright
     copyright_box = ft.Container(
         content=ft.Column([
             ft.Divider(height=1, color="#00000030"),
@@ -84,7 +106,7 @@ def main(page: ft.Page):
         padding=10,
     )
     
-    # Barra lateral completa con gradiente
+    # Barra lateral
     sidebar = ft.Container(
         content=ft.Column([nav_rail, copyright_box], spacing=0),
         width=130,
@@ -100,7 +122,7 @@ def main(page: ft.Page):
         ft.Column([
             header,
             ft.Container(
-                content=ft.Row([sidebar, ft.VerticalDivider(width=1, color="#e5e7eb"), content_area], spacing=0),
+                content=ft.Row([sidebar, ft.VerticalDivider(width=1, color="#e5e7eb"), content_wrapper], spacing=0),
                 expand=True
             )
         ], spacing=0, expand=True)

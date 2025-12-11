@@ -1,11 +1,10 @@
 ﻿"""
 INE-STRUCTUM - Página de Gestión de Proyectos
-Con opción None en Dirección y diálogo info completo
+VERSIÓN CORREGIDA - Formulario limpio y profesional
 """
 
 import flet as ft
 from datetime import datetime
-
 
 STAAD_LOAD_TYPES = [
     "Dead", "Live", "Roof Live", "Wind", "Seismic-H", "Seismic-V",
@@ -14,7 +13,6 @@ STAAD_LOAD_TYPES = [
     "Ice", "Wave", "Crane Hook", "Impact", "Push", "Gravity", "Mass", "None"
 ]
 
-# Descripciones de cada tipo de carga
 LOAD_TYPE_DESCRIPTIONS = {
     "Dead": "Cargas permanentes: peso propio de la estructura, acabados, instalaciones fijas. Factor de carga típico: 1.2 (ASCE 7-22 Eq. 2.3-1)",
     "Live": "Sobrecargas de uso: personas, muebles, equipos móviles. Factor de carga típico: 1.6 (ASCE 7-22 Eq. 2.3-1)",
@@ -54,20 +52,23 @@ class ProyectosPage:
     
     def build(self):
         header = ft.Row([
-            ft.Text("📁 Gestión de Proyectos", size=28, weight=ft.FontWeight.BOLD),
+            ft.Icon(ft.Icons.FOLDER, size=32, color="#f59e0b"),
+            ft.Text("Gestión de Proyectos", size=28, weight=ft.FontWeight.BOLD),
+            ft.Container(expand=True),
             ft.ElevatedButton("Nuevo Proyecto", icon=ft.Icons.ADD, on_click=self.show_new_project_form,
                             bgcolor="#2563eb", color="#ffffff"),
-        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+        ])
         
-        self.content_container = ft.Container(content=self.build_projects_list(), expand=True, padding=20)
+        self.content_container = ft.Container(content=self.build_projects_list(), expand=True)
         return ft.Column([header, ft.Divider(height=20), self.content_container], expand=True, scroll=ft.ScrollMode.AUTO)
     
     def build_projects_list(self):
         if len(self.proyectos) == 0:
             return ft.Container(
                 content=ft.Column([
-                    ft.Icon(ft.Icons.FOLDER_OPEN, size=80, color="#cbd5e1"),
+                    ft.Icon(ft.Icons.FOLDER, size=80, color="#cbd5e1"),
                     ft.Text("No hay proyectos creados", size=18, color="#64748b"),
+                    ft.Text("Haz clic en 'Nuevo Proyecto' para comenzar", size=14, color="#94a3b8"),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=10),
                 alignment=ft.alignment.center, expand=True
             )
@@ -81,6 +82,7 @@ class ProyectosPage:
                 ft.Column([
                     ft.Text(proyecto["nombre"], size=18, weight=ft.FontWeight.BOLD),
                     ft.Text(f"Cliente: {proyecto['codigo_cliente']}", size=14),
+                    ft.Text(f"Inelectra: {proyecto['codigo_inelectra']}", size=14),
                     ft.Text(f"Norma: {proyecto['codigo_diseno']}", size=14, color="#2563eb"),
                 ], spacing=5, expand=True),
                 ft.Column([
@@ -104,6 +106,7 @@ class ProyectosPage:
         self.editing_project = proyecto
         self.showing_form = True
         self.codigo_diseno_seleccionado = proyecto.get("codigo_diseno")
+        self.casos_de_carga = proyecto.get("casos_de_carga", [])
         self.content_container.content = self.build_project_form(proyecto)
         self.page.update()
     
@@ -116,50 +119,124 @@ class ProyectosPage:
         is_edit = proyecto_data is not None
         title = "Editar Proyecto" if is_edit else "Nuevo Proyecto"
         
-        self.input_nombre = ft.TextField(label="Nombre del Proyecto *", value=proyecto_data.get("nombre", "") if is_edit else "")
-        self.input_codigo_cliente = ft.TextField(label="Código Cliente *", value=proyecto_data.get("codigo_cliente", "") if is_edit else "")
-        self.input_codigo_inelectra = ft.TextField(label="Código Inelectra *", value=proyecto_data.get("codigo_inelectra", "") if is_edit else "")
+        # Inputs con ancho fijo máximo
+        self.input_nombre = ft.TextField(
+            label="Nombre del Proyecto *",
+            value=proyecto_data.get("nombre", "") if is_edit else "",
+            hint_text="Ej: Edificio Torre Central",
+            border_color="#cbd5e1",
+            focused_border_color="#2563eb",
+            width=800
+        )
+        
+        self.input_codigo_cliente = ft.TextField(
+            label="Código Cliente *",
+            value=proyecto_data.get("codigo_cliente", "") if is_edit else "",
+            hint_text="Ej: CLI-2025-001",
+            border_color="#cbd5e1",
+            focused_border_color="#2563eb",
+            width=390
+        )
+        
+        self.input_codigo_inelectra = ft.TextField(
+            label="Código Inelectra *",
+            value=proyecto_data.get("codigo_inelectra", "") if is_edit else "",
+            hint_text="Ej: INE-PRJ-2025-045",
+            border_color="#cbd5e1",
+            focused_border_color="#2563eb",
+            width=390
+        )
         
         self.archivo_formato = ft.Text("Ningún archivo seleccionado", color="#64748b", size=12)
-        btn_seleccionar_formato = ft.ElevatedButton("Seleccionar Plantilla", icon=ft.Icons.UPLOAD_FILE, on_click=self.select_format_file)
+        btn_seleccionar_formato = ft.ElevatedButton(
+            "Seleccionar Plantilla",
+            icon=ft.Icons.UPLOAD_FILE,
+            on_click=self.select_format_file
+        )
         
         self.dropdown_codigo_diseno = ft.Dropdown(
             label="Código de Diseño *",
+            hint_text="Selecciona un código",
             options=[
                 ft.dropdown.Option("ASCE 7-22", "ASCE 7-22 - American Society of Civil Engineers"),
                 ft.dropdown.Option("Eurocode 3", "Eurocode 3 - European Standard"),
             ],
             value=self.codigo_diseno_seleccionado,
-            on_change=self.on_codigo_diseno_changed
+            on_change=self.on_codigo_diseno_changed,
+            border_color="#cbd5e1",
+            focused_border_color="#2563eb",
+            width=800
         )
         
-        self.parametros_container = ft.Column(visible=False)
+        self.parametros_container = ft.Column(visible=bool(self.codigo_diseno_seleccionado))
+        if self.codigo_diseno_seleccionado == "ASCE 7-22":
+            self.parametros_container.controls = self.build_parametros_asce()
         
         form = ft.Column([
-            ft.Text(title, size=24, weight=ft.FontWeight.BOLD),
-            ft.Divider(height=20),
-            ft.Text("📋 Información General", size=18, weight=ft.FontWeight.BOLD),
+            ft.Text(title, size=24, weight=ft.FontWeight.BOLD, color="#1e293b"),
+            ft.Divider(height=30, color="#e2e8f0"),
+            
+            # SECCIÓN 1: Información General
+            ft.Text("📋 Información General", size=18, weight=ft.FontWeight.BOLD, color="#475569"),
+            ft.Container(height=10),
             self.input_nombre,
-            ft.Row([self.input_codigo_cliente, self.input_codigo_inelectra], spacing=10),
-            ft.Divider(height=10),
-            ft.Text("📄 Formato de Reporte Base", size=16, weight=ft.FontWeight.BOLD),
+            ft.Container(height=15),
+            ft.Row([self.input_codigo_cliente, self.input_codigo_inelectra], spacing=15),
+            
+            ft.Container(height=25),
+            ft.Divider(color="#e2e8f0"),
+            ft.Container(height=15),
+            
+            # SECCIÓN 2: Formato de Reporte
+            ft.Text("📄 Formato de Reporte Base", size=16, weight=ft.FontWeight.BOLD, color="#475569"),
+            ft.Text("Selecciona la plantilla Excel/Word para generar reportes", size=12, color="#64748b"),
+            ft.Container(height=10),
             btn_seleccionar_formato,
+            ft.Container(height=5),
             self.archivo_formato,
-            ft.Divider(height=10),
-            ft.Text("⚙ Código de Diseño", size=16, weight=ft.FontWeight.BOLD),
+            
+            ft.Container(height=25),
+            ft.Divider(color="#e2e8f0"),
+            ft.Container(height=15),
+            
+            # SECCIÓN 3: Código de Diseño
+            ft.Text("⚙️ Código de Diseño", size=16, weight=ft.FontWeight.BOLD, color="#475569"),
+            ft.Container(height=10),
             self.dropdown_codigo_diseno,
-            ft.Divider(height=20),
+            
+            ft.Container(height=20),
             self.parametros_container,
-            ft.Divider(height=30),
+            
+            ft.Container(height=30),
+            ft.Divider(color="#e2e8f0"),
+            ft.Container(height=20),
+            
+            # Botones de acción
             ft.Row([
-                ft.ElevatedButton("💾 Guardar Proyecto", icon=ft.Icons.SAVE, on_click=self.save_project_final,
-                                bgcolor="#10b981", color="#ffffff", height=50),
-                ft.OutlinedButton("Cancelar", icon=ft.Icons.CANCEL, on_click=self.cancel_form, height=50),
-            ], spacing=10),
-        ], scroll=ft.ScrollMode.AUTO, spacing=15)
+                ft.ElevatedButton(
+                    "Guardar Proyecto",
+                    icon=ft.Icons.SAVE,
+                    on_click=self.save_project_final,
+                    bgcolor="#10b981",
+                    color="#ffffff",
+                    height=50
+                ),
+                ft.OutlinedButton(
+                    "Cancelar",
+                    icon=ft.Icons.CANCEL,
+                    on_click=self.cancel_form,
+                    height=50
+                ),
+            ], spacing=15),
+        ], scroll=ft.ScrollMode.AUTO, spacing=0)
         
-        return ft.Container(content=form, bgcolor="#ffffff", padding=30, border_radius=12,
-                          shadow=ft.BoxShadow(spread_radius=1, blur_radius=10, color="#00000010"))
+        return ft.Container(
+            content=form,
+            bgcolor="#ffffff",
+            padding=30,
+            border_radius=12,
+            shadow=ft.BoxShadow(spread_radius=1, blur_radius=10, color="#00000010")
+        )
     
     def on_codigo_diseno_changed(self, e):
         self.codigo_diseno_seleccionado = e.control.value
@@ -168,21 +245,36 @@ class ProyectosPage:
             self.parametros_container.visible = True
         else:
             self.parametros_container.visible = False
+            self.parametros_container.controls = []
         self.page.update()
     
     def build_parametros_asce(self):
-        self.input_ss = ft.TextField(label="Ss (g) *", value="1.5", expand=True)
-        self.input_s1 = ft.TextField(label="S1 (g) *", value="0.6", expand=True)
-        self.input_fa = ft.TextField(label="Fa *", value="1.0", expand=True)
-        self.input_fv = ft.TextField(label="Fv *", value="1.5", expand=True)
-        self.input_tl = ft.TextField(label="TL (s) *", value="8.0")
-        self.dropdown_site_class = ft.Dropdown(label="Site Class *", options=[ft.dropdown.Option(x) for x in ["A","B","C","D","E","F"]], value="D")
-        self.dropdown_risk_category = ft.Dropdown(label="Risk Category *", options=[ft.dropdown.Option(x) for x in ["I","II","III","IV"]], value="II")
+        # Valores por defecto para parámetros sísmicos con ancho fijo
+        self.input_ss = ft.TextField(label="Ss (g) *", value="1.5", width=190)
+        self.input_s1 = ft.TextField(label="S1 (g) *", value="0.6", width=190)
+        self.input_fa = ft.TextField(label="Fa *", value="1.0", width=190)
+        self.input_fv = ft.TextField(label="Fv *", value="1.5", width=190)
+        self.input_tl = ft.TextField(label="TL (s) *", value="8.0", width=190)
         
+        self.dropdown_site_class = ft.Dropdown(
+            label="Site Class *",
+            options=[ft.dropdown.Option(x) for x in ["A","B","C","D","E","F"]],
+            value="D",
+            width=190
+        )
+        
+        self.dropdown_risk_category = ft.Dropdown(
+            label="Risk Category *",
+            options=[ft.dropdown.Option(x) for x in ["I","II","III","IV"]],
+            value="II",
+            width=190
+        )
+        
+        # Inicializar tabla de casos de carga si está vacía
         if not self.casos_de_carga:
             self.casos_de_carga = [
-                {"no": 1, "nombre": "DEAD", "tipo": "Dead", "descripcion": "Peso propio", "direccion": None},
-                {"no": 2, "nombre": "LIVE", "tipo": "Live", "descripcion": "Carga viva", "direccion": None},
+                {"no": 1, "nombre": "DEAD", "tipo": "Dead", "descripcion": "Peso propio", "direccion": "None"},
+                {"no": 2, "nombre": "LIVE", "tipo": "Live", "descripcion": "Carga viva", "direccion": "None"},
                 {"no": 3, "nombre": "WINDX+", "tipo": "Wind", "descripcion": "Viento +X", "direccion": "X+"},
                 {"no": 4, "nombre": "WINDX-", "tipo": "Wind", "descripcion": "Viento -X", "direccion": "X-"},
                 {"no": 5, "nombre": "WINDZ+", "tipo": "Wind", "descripcion": "Viento +Z", "direccion": "Z+"},
@@ -192,42 +284,65 @@ class ProyectosPage:
             ]
         
         return [
+            ft.Container(height=20),
             ft.Text("🔧 Configuración - ASCE 7-22", size=20, weight=ft.FontWeight.BOLD, color="#2563eb"),
-            ft.Divider(height=10),
-            ft.Text("⚠ Parámetros Sísmicos del Sitio", size=18, weight=ft.FontWeight.BOLD),
-            ft.Row([self.input_ss, self.input_s1], spacing=10),
-            ft.Row([self.input_fa, self.input_fv], spacing=10),
-            self.input_tl,
-            self.dropdown_site_class,
-            self.dropdown_risk_category,
-            ft.Divider(height=20),
-            ft.Text("📋 Casos de Carga Primarios", size=18, weight=ft.FontWeight.BOLD),
+            ft.Container(height=20),
+            
+            ft.Text("⚠️ Parámetros Sísmicos del Sitio", size=16, weight=ft.FontWeight.BOLD, color="#475569"),
+            ft.Container(height=15),
+            ft.Row([self.input_ss, self.input_s1, self.input_fa, self.input_fv], spacing=15),
+            ft.Container(height=10),
+            ft.Row([self.input_tl, self.dropdown_site_class, self.dropdown_risk_category], spacing=15),
+            
+            ft.Container(height=30),
+            ft.Divider(color="#e2e8f0"),
+            ft.Container(height=20),
+            
+            ft.Text("📋 Casos de Carga Primarios", size=16, weight=ft.FontWeight.BOLD, color="#475569"),
+            ft.Container(height=15),
             self.build_casos_de_carga_table(),
         ]
     
     def build_casos_de_carga_table(self):
+        # Header de la tabla
         header = ft.Container(
             content=ft.Row([
-                ft.Text("No.", size=12, weight=ft.FontWeight.BOLD, width=40),
-                ft.Text("Nombre", size=12, weight=ft.FontWeight.BOLD, expand=2),
-                ft.Text("Tipo STAAD", size=12, weight=ft.FontWeight.BOLD, expand=2),
-                ft.Text("Dirección", size=12, weight=ft.FontWeight.BOLD, expand=2),
-                ft.Text("Descripción", size=12, weight=ft.FontWeight.BOLD, expand=2),
-                ft.Text("Acciones", size=12, weight=ft.FontWeight.BOLD, width=120),
+                ft.Text("No.", size=13, weight=ft.FontWeight.BOLD, width=50),
+                ft.Text("Nombre", size=13, weight=ft.FontWeight.BOLD, expand=2),
+                ft.Text("Tipo STAAD", size=13, weight=ft.FontWeight.BOLD, expand=2),
+                ft.Text("Dirección", size=13, weight=ft.FontWeight.BOLD, expand=2),
+                ft.Text("Descripción", size=13, weight=ft.FontWeight.BOLD, expand=2),
+                ft.Container(width=130),
             ], spacing=10),
-            bgcolor="#f1f5f9", padding=10, border_radius=8
+            bgcolor="#f1f5f9",
+            padding=15,
+            border_radius=8
         )
         
+        # Filas de datos
         rows = []
         for i, caso in enumerate(self.casos_de_carga):
             row = ft.Container(
                 content=ft.Row([
-                    ft.Text(str(caso["no"]), size=12, width=40),
-                    ft.TextField(value=caso["nombre"], dense=True, text_size=12, expand=2),
-                    ft.Dropdown(value=caso["tipo"], options=[ft.dropdown.Option(t) for t in STAAD_LOAD_TYPES], 
-                               dense=True, text_size=12, expand=2),
+                    ft.Text(str(caso["no"]), size=12, width=50),
+                    ft.TextField(
+                        value=caso["nombre"],
+                        dense=True,
+                        text_size=12,
+                        expand=2,
+                        border_color="#cbd5e1",
+                        on_change=lambda e, idx=i: self.update_caso_field(idx, "nombre", e.control.value)
+                    ),
                     ft.Dropdown(
-                        value=caso.get("direccion"),
+                        value=caso["tipo"],
+                        options=[ft.dropdown.Option(t) for t in STAAD_LOAD_TYPES],
+                        dense=True,
+                        text_size=12,
+                        expand=2,
+                        on_change=lambda e, idx=i: self.update_caso_field(idx, "tipo", e.control.value)
+                    ),
+                    ft.Dropdown(
+                        value=caso.get("direccion", "None"),
                         options=[
                             ft.dropdown.Option("None", "None"),
                             ft.dropdown.Option("X", "X (Sismo)"),
@@ -238,82 +353,185 @@ class ProyectosPage:
                             ft.dropdown.Option("Z+", "+Z (Viento)"),
                             ft.dropdown.Option("Z-", "-Z (Viento)"),
                         ],
-                        dense=True, text_size=12, expand=2, hint_text="Opcional"
+                        dense=True,
+                        text_size=12,
+                        expand=2,
+                        hint_text="Opcional",
+                        on_change=lambda e, idx=i: self.update_caso_field(idx, "direccion", e.control.value)
                     ),
-                    ft.TextField(value=caso["descripcion"], dense=True, text_size=12, expand=2),
+                    ft.TextField(
+                        value=caso["descripcion"],
+                        dense=True,
+                        text_size=12,
+                        expand=2,
+                        border_color="#cbd5e1",
+                        on_change=lambda e, idx=i: self.update_caso_field(idx, "descripcion", e.control.value)
+                    ),
                     ft.Row([
-                        ft.IconButton(icon=ft.Icons.ARROW_UPWARD, icon_color="#2563eb", icon_size=16, disabled=(i==0)),
-                        ft.IconButton(icon=ft.Icons.ARROW_DOWNWARD, icon_color="#2563eb", icon_size=16, disabled=(i==len(self.casos_de_carga)-1)),
-                        ft.IconButton(icon=ft.Icons.DELETE, icon_color="#ef4444", icon_size=16),
-                    ], spacing=2, width=120),
+                        ft.IconButton(
+                            icon=ft.Icons.ARROW_UPWARD,
+                            icon_color="#2563eb",
+                            icon_size=18,
+                            disabled=(i==0),
+                            tooltip="Mover arriba",
+                            on_click=lambda e, idx=i: self.move_caso_up(idx)
+                        ),
+                        ft.IconButton(
+                            icon=ft.Icons.ARROW_DOWNWARD,
+                            icon_color="#2563eb",
+                            icon_size=18,
+                            disabled=(i==len(self.casos_de_carga)-1),
+                            tooltip="Mover abajo",
+                            on_click=lambda e, idx=i: self.move_caso_down(idx)
+                        ),
+                        ft.IconButton(
+                            icon=ft.Icons.DELETE,
+                            icon_color="#ef4444",
+                            icon_size=18,
+                            tooltip="Eliminar",
+                            on_click=lambda e, idx=i: self.delete_caso(idx)
+                        ),
+                    ], spacing=0, width=130),
                 ], spacing=10),
-                padding=ft.padding.symmetric(vertical=5)
+                padding=ft.padding.symmetric(vertical=8, horizontal=10),
+                border=ft.border.only(bottom=ft.BorderSide(1, "#e2e8f0"))
             )
             rows.append(row)
         
-        buttons_row = ft.Row([
-            ft.ElevatedButton("➕ Agregar Caso", on_click=self.add_caso_carga, height=35),
-            ft.IconButton(icon=ft.Icons.INFO_OUTLINED, icon_color="#2563eb", tooltip="Info tipos de carga",
-                         on_click=self.show_load_types_info),
-        ], spacing=10)
+        # Botones de acción
+        buttons_row = ft.Container(
+            content=ft.Row([
+                ft.ElevatedButton(
+                    "Agregar Caso",
+                    icon=ft.Icons.ADD,
+                    on_click=self.add_caso_carga,
+                    height=40,
+                    bgcolor="#2563eb",
+                    color="#ffffff"
+                ),
+                ft.IconButton(
+                    icon=ft.Icons.INFO_OUTLINED,
+                    icon_color="#2563eb",
+                    tooltip="Ver guía de tipos de carga",
+                    on_click=self.show_load_types_info,
+                    icon_size=24
+                ),
+            ], spacing=10),
+            padding=ft.padding.only(top=15)
+        )
         
+        # Nota informativa
         info_box = ft.Container(
             content=ft.Text(
                 "🎯 La columna 'Dirección' identifica casos para combinaciones automáticas. "
-                "Viento permite múltiples direcciones (+X, -X, +Z, -Z).",
-                size=11, color="#64748b"
+                "Viento permite múltiples direcciones (+X, -X, +Z, -Z). Use 'None' para casos que no requieren dirección.",
+                size=11,
+                color="#64748b"
             ),
-            bgcolor="#f8fafc", padding=15, border_radius=8, margin=ft.margin.only(top=10)
+            bgcolor="#f8fafc",
+            padding=15,
+            border_radius=8,
+            margin=ft.margin.only(top=15),
+            border=ft.border.all(1, "#e2e8f0")
         )
         
-        return ft.Column([header, *rows, buttons_row, info_box])
+        return ft.Column([header, *rows, buttons_row, info_box], spacing=0)
+    
+    def update_caso_field(self, index, field, value):
+        """Actualiza un campo específico de un caso de carga"""
+        if 0 <= index < len(self.casos_de_carga):
+            self.casos_de_carga[index][field] = value
+    
+    def move_caso_up(self, index):
+        """Mueve un caso de carga hacia arriba"""
+        if index > 0:
+            self.casos_de_carga[index], self.casos_de_carga[index-1] = self.casos_de_carga[index-1], self.casos_de_carga[index]
+            # Actualizar números
+            self.casos_de_carga[index]["no"] = index + 1
+            self.casos_de_carga[index-1]["no"] = index
+            self.parametros_container.controls = self.build_parametros_asce()
+            self.page.update()
+    
+    def move_caso_down(self, index):
+        """Mueve un caso de carga hacia abajo"""
+        if index < len(self.casos_de_carga) - 1:
+            self.casos_de_carga[index], self.casos_de_carga[index+1] = self.casos_de_carga[index+1], self.casos_de_carga[index]
+            # Actualizar números
+            self.casos_de_carga[index]["no"] = index + 1
+            self.casos_de_carga[index+1]["no"] = index + 2
+            self.parametros_container.controls = self.build_parametros_asce()
+            self.page.update()
+    
+    def delete_caso(self, index):
+        """Elimina un caso de carga"""
+        if len(self.casos_de_carga) > 1:
+            self.casos_de_carga.pop(index)
+            # Renumerar
+            for i, caso in enumerate(self.casos_de_carga):
+                caso["no"] = i + 1
+            self.parametros_container.controls = self.build_parametros_asce()
+            self.page.update()
     
     def show_load_types_info(self, e):
-        # Crear contenido scrollable con TODAS las descripciones
-        descriptions_widgets = []
+        """Muestra diálogo con información de tipos de carga"""
+        descriptions = []
         for load_type in STAAD_LOAD_TYPES:
             desc = LOAD_TYPE_DESCRIPTIONS.get(load_type, "Sin descripción")
-            descriptions_widgets.append(
-                ft.Container(
-                    content=ft.Column([
-                        ft.Text(f"• {load_type}", size=13, weight=ft.FontWeight.BOLD, color="#2563eb"),
-                        ft.Text(desc, size=12, color="#475569"),
-                    ], spacing=3),
-                    padding=ft.padding.only(bottom=10)
-                )
-            )
+            descriptions.append(f"• {load_type}\n  {desc}\n")
         
-        dialog = ft.AlertDialog(
-            title=ft.Text("ℹ️ Guía Completa de Tipos de Carga STAAD.Pro", weight=ft.FontWeight.BOLD),
+        content_text = "\n".join(descriptions)
+        
+        def close_dlg(e):
+            if hasattr(self.page, 'dialog') and self.page.dialog:
+                self.page.dialog.open = False
+                self.page.update()
+        
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Row([
+                ft.Icon(ft.Icons.INFO_OUTLINED, color="#2563eb", size=24),
+                ft.Text("Guía de Tipos de Carga STAAD.Pro", size=16, weight=ft.FontWeight.BOLD)
+            ], spacing=10),
             content=ft.Container(
-                content=ft.Column(descriptions_widgets, spacing=5, scroll=ft.ScrollMode.AUTO),
+                content=ft.Column([
+                    ft.Text(content_text, size=12, selectable=True)
+                ], scroll=ft.ScrollMode.AUTO),
                 width=700,
-                height=500
+                height=450,
+                padding=20
             ),
-            actions=[ft.TextButton("Cerrar", on_click=lambda e: self.close_dialog())],
+            actions=[ft.TextButton("Cerrar", on_click=close_dlg)],
+            actions_alignment=ft.MainAxisAlignment.END
         )
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
-    
-    def close_dialog(self):
-        self.page.dialog.open = False
+        
+        self.page.dialog = dlg
+        dlg.open = True
         self.page.update()
     
     def add_caso_carga(self, e):
         next_no = len(self.casos_de_carga) + 1
-        self.casos_de_carga.append({"no": next_no, "nombre": f"CASO{next_no}", "tipo": "Live", 
-                                    "direccion": None, "descripcion": "Nuevo caso"})
+        self.casos_de_carga.append({
+            "no": next_no,
+            "nombre": f"CASO{next_no}",
+            "tipo": "Live",
+            "direccion": "None",
+            "descripcion": "Nuevo caso"
+        })
         self.parametros_container.controls = self.build_parametros_asce()
         self.page.update()
     
     def select_format_file(self, e):
-        self.archivo_formato.value = "Plantilla_Inelectra_2025.xlsx"
+        self.archivo_formato.value = "✅ Plantilla_Inelectra_2025.xlsx"
+        self.archivo_formato.color = "#10b981"
         self.page.update()
     
     def save_project_final(self, e):
-        if not self.input_nombre.value or not self.dropdown_codigo_diseno.value:
-            self.show_error("Completa los campos obligatorios")
+        # Validaciones
+        if not self.input_nombre.value:
+            self.show_error("❌ El nombre del proyecto es obligatorio")
+            return
+        if not self.dropdown_codigo_diseno.value:
+            self.show_error("❌ Debes seleccionar un código de diseño")
             return
         
         proyecto = {
@@ -321,7 +539,7 @@ class ProyectosPage:
             "codigo_cliente": self.input_codigo_cliente.value,
             "codigo_inelectra": self.input_codigo_inelectra.value,
             "codigo_diseno": self.dropdown_codigo_diseno.value,
-            "casos_de_carga": self.casos_de_carga.copy(),
+            "casos_de_carga": self.casos_de_carga.copy() if self.casos_de_carga else [],
             "fecha_creacion": datetime.now().strftime("%Y-%m-%d %H:%M"),
         }
         
@@ -334,7 +552,7 @@ class ProyectosPage:
         self.showing_form = False
         self.content_container.content = self.build_projects_list()
         self.page.update()
-        self.show_success("✅ Proyecto guardado")
+        self.show_success("✅ Proyecto guardado exitosamente")
     
     def cancel_form(self, e):
         self.showing_form = False
@@ -342,13 +560,13 @@ class ProyectosPage:
         self.page.update()
     
     def show_error(self, msg):
-        snack = ft.SnackBar(content=ft.Text(msg, color="#ffffff"), bgcolor="#ef4444")
+        snack = ft.SnackBar(content=ft.Text(msg, color="#ffffff"), bgcolor="#ef4444", duration=3000)
         self.page.overlay.append(snack)
         snack.open = True
         self.page.update()
     
     def show_success(self, msg):
-        snack = ft.SnackBar(content=ft.Text(msg, color="#ffffff"), bgcolor="#10b981")
+        snack = ft.SnackBar(content=ft.Text(msg, color="#ffffff"), bgcolor="#10b981", duration=3000)
         self.page.overlay.append(snack)
         snack.open = True
         self.page.update()

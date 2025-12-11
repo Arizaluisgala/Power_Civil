@@ -74,7 +74,8 @@ class INEStructumApp:
                         self.main_content
                     ],
                     expand=True,
-                    spacing=0
+                    spacing=0,
+                    vertical_alignment=ft.CrossAxisAlignment.STRETCH
                 ),
                 self.create_footer()
             ],
@@ -137,13 +138,17 @@ class INEStructumApp:
         
         return ft.Container(
             content=ft.Column(
-                menu_items,
-                spacing=5,
-                scroll=ft.ScrollMode.AUTO
+                [
+                    ft.Container(expand=True),  # Espaciador superior
+                    ft.Column(menu_items, spacing=5),
+                    ft.Container(expand=True),  # Espaciador inferior
+                ],
+                expand=True,
+                alignment=ft.MainAxisAlignment.CENTER
             ),
-            width=250,
+            width=250,width=250,
             bgcolor=self.colors['surface'],
-            padding=10,
+            padding=10,            expand=True,
             shadow=ft.BoxShadow(
                 spread_radius=1,
                 blur_radius=10,
@@ -280,3 +285,8 @@ class INEStructumApp:
             ],
             scroll=ft.ScrollMode.AUTO
         )
+
+
+
+
+
