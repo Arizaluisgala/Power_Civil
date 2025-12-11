@@ -1,30 +1,18 @@
-"""
-INE STRUCTUM - Software de Verificación Estructural
-Punto de entrada principal de la aplicación
-
-Autor: Luis Ariza - Inelectra
-Fecha: Diciembre 2025
+﻿"""
+INE-STRUCTUM - Punto de entrada principal
+Ejecuta la aplicación Flet
 """
 
-import sys
-from pathlib import Path
-
-# Agregar directorio src al path de Python
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+import flet as ft
+from src.app import INEStructumApp
 
 
-def main():
-    """
-    Función principal que inicia la aplicación
-    """
-    print("=" * 60)
-    print("INE STRUCTUM - Inicializando...")
-    print("=" * 60)
-    
-    # TODO: Aquí inicializaremos la aplicación después
-    print("\n✅ Configuración exitosa!")
-    print("📋 Próximo paso: Crear entorno virtual")
-    
+def main(page: ft.Page):
+    """Función principal que ejecuta la aplicación"""
+    app = INEStructumApp()
+    app.main(page)
+
 
 if __name__ == "__main__":
-    main()
+    print("🚀 Iniciando INE-STRUCTUM...")
+    ft.app(target=main)

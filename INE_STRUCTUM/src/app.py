@@ -1,4 +1,4 @@
-"""
+﻿"""
 INE-STRUCTUM - Aplicación Principal
 Sistema de Verificación Estructural para STAAD.Pro
 
@@ -8,6 +8,7 @@ Versión: 1.0.0 Beta
 """
 
 import flet as ft
+from src.views.proyectos_page import ProyectosPage
 
 
 class INEStructumApp:
@@ -175,7 +176,9 @@ class INEStructumApp:
         if section_id == "inicio":
             return self.create_inicio_section()
         elif section_id == "proyectos":
-            return self.create_proyectos_section()
+            # NUEVA PÁGINA INTEGRADA
+            proyectos_page = ProyectosPage(self.page)
+            return proyectos_page.build()
         elif section_id == "productos":
             return self.create_productos_section()
         elif section_id == "verificaciones":
@@ -221,18 +224,6 @@ class INEStructumApp:
             ],
             scroll=ft.ScrollMode.AUTO,
             expand=True
-        )
-    
-    def create_proyectos_section(self):
-        """Gestión de proyectos"""
-        return ft.Column(
-            [
-                ft.Text("📁 Gestión de Proyectos", size=24, weight=ft.FontWeight.BOLD),
-                ft.Divider(),
-                ft.Text("[Fase 3] Aquí se gestionarán proyectos con parámetros sísmicos", 
-                       color=self.colors['warning'])
-            ],
-            scroll=ft.ScrollMode.AUTO
         )
     
     def create_productos_section(self):
