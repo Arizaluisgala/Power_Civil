@@ -18,6 +18,7 @@ class INEStructumApp:
         self.page = None
         self.current_section = "inicio"
         
+        # Paleta de colores profesional
         self.colors = {
             'primary': '#2563eb',
             'secondary': '#06b6d4',
@@ -30,7 +31,7 @@ class INEStructumApp:
             'text_secondary': '#6b7280',
         }
         
-        # SECCIONES CORRECTAS según arquitectura
+        # SECCIONES DE LA APLICACIÓN
         self.sections = {
             'inicio': {'icon': '🏠', 'title': 'Inicio'},
             'proyectos': {'icon': '📁', 'title': 'Gestión de Proyectos'},
@@ -44,7 +45,7 @@ class INEStructumApp:
         """Inicializa la aplicación"""
         self.page = page
         
-        # Configurar ventana
+        # Configurar ventana principal
         page.title = "INE-STRUCTUM v1.0.0"
         page.window.width = 1280
         page.window.height = 800
@@ -176,7 +177,7 @@ class INEStructumApp:
         if section_id == "inicio":
             return self.create_inicio_section()
         elif section_id == "proyectos":
-            # NUEVA PÁGINA INTEGRADA
+            # Integración con la página de proyectos
             proyectos_page = ProyectosPage(self.page)
             return proyectos_page.build()
         elif section_id == "productos":
@@ -279,13 +280,3 @@ class INEStructumApp:
             ],
             scroll=ft.ScrollMode.AUTO
         )
-
-
-def main():
-    """Punto de entrada"""
-    app = INEStructumApp()
-    ft.app(target=app.main)
-
-
-if __name__ == "__main__":
-    main()
