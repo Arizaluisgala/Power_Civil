@@ -1,310 +1,253 @@
 ﻿"""
-Modelos de datos para sistema Proyecto -> Producto
-JERARQUIA: Proyecto (global) -> Productos (archivos .STD individuales)
-VERSION COMPLETA CON DESERIALIZACION
+Modelos de datos para Proyecto
+ACTUALIZADO: Enfoque ASCE 7-22 / AISC 360-22 / ACI 318
 """
-
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
-from enum import Enum
+from typing import List, Optional, Dict
 from datetime import datetime
-import json
-from pathlib import Path
+from enum import Enum
+
 
 class DesignCode(Enum):
-    """Codigos de diseño soportados"""
-    ASCE_7_22 = "ASCE 7-22"
-    ASCE_7_16 = "ASCE 7-16"
-    EUROCODE_8 = "Eurocode 8"
-    NSR_10 = "NSR-10"
+    """Códigos de diseño soportados"""
+    ASCE722 = "ASCE 7-22"
+    AISC36022 = "AISC 360-22"
+    ACI318 = "ACI 318-19"
 
-class LoadCaseType(Enum):
-    """Tipos de casos de carga"""
+
+class SiteClass(Enum):
+    """Clase de sitio sísmico según ASCE 7-22 Table 20.3-1"""
+    A = "A - Hard rock"
+    B = "B - Rock"
+    C = "C - Very dense soil and soft rock"
+    D = "D - Stiff soil"
+    E = "E - Soft clay soil"
+    F = "F - Soils requiring site response analysis"
+
+
+class RiskCategory(Enum):
+    """Categoría de riesgo sísmico según ASCE 7-22 Table 1.5-1"""
+    I = "I - Low hazard"
+    II = "II - Standard occupancy"
+    III = "III - Substantial public hazard"
+    IV = "IV - Essential facilities"
+
+
+class LoadType(Enum):
+    """Tipos de carga según STAAD.Pro"""
     DEAD = "Dead"
+    SUPERDEAD = "Super Dead"
     LIVE = "Live"
-    LIVE_ROOF = "LiveRoof"
-    WIND_X_POS = "Wind+X"
-    WIND_X_NEG = "Wind-X"
-    WIND_Z_POS = "Wind+Z"
-    WIND_Z_NEG = "Wind-Z"
-    SEISMIC_X = "SeismicX"
-    SEISMIC_Z = "SeismicZ"
-    SEISMIC_Y = "SeismicY"
+    ROOFLIVE = "Roof Live"
+    SNOW = "Snow"
+    WIND = "Wind"
+    SEISMIC = "Seismic"
     TEMPERATURE = "Temperature"
-    SETTLEMENT = "Settlement"
-    OTHER = "Other"
+    FLUID = "Fluid"
+    SOIL = "Soil"
+    ACCIDENTAL = "Accidental"
+
+
+class LoadDirection(Enum):
+    """Dirección de carga"""
+    PLUS_X = "+X"
+    MINUS_X = "-X"
+    PLUS_Y = "+Y"
+    MINUS_Y = "-Y"
+    PLUS_Z = "+Z"
+    MINUS_Z = "-Z"
+    NONE = "-"
+
 
 @dataclass
-class LoadCaseMapping:
-    """Mapeo de casos de carga del modelo STAAD al tipo"""
-    staad_case_number: int
-    staad_case_name: str
-    case_type: LoadCaseType
-    description: str = ""
+class LoadCase:
+    """Caso de carga primario"""
+    staad_number: int
+    name: str
+    load_type: LoadType
+    direction: LoadDirection = LoadDirection.NONE
+    is_seismic_x: bool = False  # Para clasificación de sismo en X
+    is_seismic_z: bool = False  # Para clasificación de sismo en Z
+    is_vertical_seismic: bool = False  # Para componente vertical
 
-@dataclass
-class DeflectionLimit:
-    """Limites de deflexion para un tipo de miembro"""
-    member_type: str
-    live_load_denominator: float
-    total_load_denominator: float
-    absolute_limit_mm: Optional[float] = None
-    code_reference: str = ""
-
-@dataclass
-class DriftLimit:
-    """Limites de deriva sismica"""
-    story_height_m: float
-    drift_limit_percent: float
-    code_reference: str = ""
 
 @dataclass
 class SeismicParameters:
-    """Parametros sismicos del proyecto"""
-    design_code: DesignCode = DesignCode.ASCE_7_22
-    R_factor: float = 5.0
-    Cd_factor: float = 4.5
-    omega_factor: float = 1.0
-    q_factor: Optional[float] = None
-    nu_factor: Optional[float] = None
-    seismic_cases: Dict[str, int] = field(default_factory=dict)
-    importance_factor: float = 1.0
-    drift_limits: List[DriftLimit] = field(default_factory=list)
+    """Parámetros sísmicos según ASCE 7-22 Chapter 11"""
+    # Aceleraciones espectrales
+    ss: float = 0.0  # Short-period spectral acceleration
+    s1: float = 0.0  # 1-second spectral acceleration
+    
+    # Clase de sitio y factores
+    site_class: SiteClass = SiteClass.D
+    fa: Optional[float] = None  # Automático si None
+    fv: Optional[float] = None  # Automático si None
+    
+    # Periodo de transición
+    tl: float = 8.0  # Typical default
+    
+    # Resultados calculados (automático)
+    sms: Optional[float] = None  # Fa × Ss
+    sm1: Optional[float] = None  # Fv × S1
+    sds: Optional[float] = None  # (2/3) × SMS
+    sd1: Optional[float] = None  # (2/3) × SM1
+    sdc: Optional[str] = None  # A, B, C, D, E, F
+
 
 @dataclass
-class WindParameters:
-    """Parametros de viento del proyecto"""
-    wind_cases: Dict[str, int] = field(default_factory=dict)
-    displacement_limit_h_over: float = 500.0
-    code_reference: str = ""
+class WindDriftParameters:
+    """Parámetros de deriva por viento según ASCE 7-22 Appendix C"""
+    check_wind_drift: bool = False
+    
+    # Drift total del edificio
+    total_drift_denominator: Optional[int] = 400  # H/400, H/500, H/600
+    use_custom_total: bool = False
+    custom_total_mm: Optional[float] = None
+    
+    # Drift de entrepiso
+    story_drift_denominator: Optional[int] = 300  # h/300
+    use_custom_story: bool = False
+    custom_story_mm: Optional[float] = None
+
 
 @dataclass
-class Product:
-    """
-    PRODUCTO: Archivo .STD individual con verificaciones especificas
-    Pertenece a un PROYECTO
-    """
-    product_id: str
-    name: str
-    description: str = ""
-    staad_file_path: Path = field(default_factory=Path)
-    parent_project: Optional['Project'] = None
-    custom_seismic_params: Optional[SeismicParameters] = None
-    custom_deflection_limits: Optional[List[DeflectionLimit]] = None
-    last_analyzed: Optional[datetime] = None
-    is_valid: bool = False
-    verification_results: dict = field(default_factory=dict)
+class SeismicDriftParameters:
+    """Parámetros de deriva sísmica según ASCE 7-22 Table 12.12-1"""
+    risk_category: RiskCategory = RiskCategory.II
     
-    def get_seismic_params(self) -> SeismicParameters:
-        """Obtener parametros sismicos (custom o del proyecto)"""
-        if self.custom_seismic_params:
-            return self.custom_seismic_params
-        elif self.parent_project and self.parent_project.seismic_params:
-            return self.parent_project.seismic_params
-        else:
-            return SeismicParameters()
+    # Tipo de estructura
+    is_shear_wall: bool = False
+    is_risk_iii_iv: bool = False
     
-    def get_deflection_limits(self) -> List[DeflectionLimit]:
-        """Obtener limites de deflexion (custom o del proyecto)"""
-        if self.custom_deflection_limits:
-            return self.custom_deflection_limits
-        elif self.parent_project:
-            return self.parent_project.deflection_limits
-        else:
-            return []
+    # Límite de deriva (default según tabla)
+    drift_limit: float = 0.020  # 2.0% para Risk Cat I/II general
     
-    def to_dict(self) -> dict:
-        """Serializar a diccionario"""
-        return {
-            "product_id": self.product_id,
-            "name": self.name,
-            "description": self.description,
-            "staad_file_path": str(self.staad_file_path),
-            "last_analyzed": self.last_analyzed.isoformat() if self.last_analyzed else None,
-            "is_valid": self.is_valid
-        }
+    # Factor de amplificación
+    cd_factor: float = 5.5  # Típico para SMF
+    
+    # Altura típica de entrepiso
+    story_height_m: float = 3.5
+
+
+@dataclass
+class DeflectionVerification:
+    """Verificación de deflexión individual - CON SELECTOR DE TIPO"""
+    group_name: str
+    
+    # CASO 1
+    case1_enabled: bool = False
+    case1_use_factor: bool = True  # True = L/denom, False = límite absoluto
+    case1_denominator: Optional[float] = None  # Para L/240
+    case1_limit_mm: Optional[float] = None  # Para límite absoluto
+    case1_load_type: str = "Live Load (L)"
+    
+    # CASO 2
+    case2_enabled: bool = False
+    case2_use_factor: bool = True
+    case2_denominator: Optional[float] = None
+    case2_limit_mm: Optional[float] = None
+    case2_load_type: str = "Carga Muerta + Carga Viva (D+L)"
+    
+    # CASO 3
+    case3_enabled: bool = False
+    case3_use_factor: bool = True
+    case3_denominator: Optional[float] = None
+    case3_limit_mm: Optional[float] = None
+    case3_load_type: str = "Wind (W)"
+
+
+@dataclass
+class HorizontalDeflectionVerification:
+    """Verificación de deflexión horizontal - CON SELECTOR DE TIPO"""
+    group_name: str
+    enabled: bool = False
+    
+    use_factor: bool = True  # True = H/denom, False = límite absoluto
+    denominator: Optional[float] = None  # Para H/400
+    limit_mm: Optional[float] = None  # Para límite absoluto
+    load_type: str = "Wind (W)"
+
 
 @dataclass
 class Project:
-    """
-    PROYECTO: Contenedor global con configuracion comun
-    Puede tener multiples PRODUCTOS (.STD files)
-    """
-    name: str
-    description: str = ""
-    created_date: datetime = field(default_factory=datetime.now)
-    modified_date: datetime = field(default_factory=datetime.now)
-    project_folder: Path = field(default_factory=Path)
-    design_code: DesignCode = DesignCode.ASCE_7_22
-    seismic_params: Optional[SeismicParameters] = None
-    wind_params: Optional[WindParameters] = None
-    load_case_mapping: Dict[str, LoadCaseMapping] = field(default_factory=dict)
-    deflection_limits: List[DeflectionLimit] = field(default_factory=list)
-    products: Dict[str, Product] = field(default_factory=dict)
+    """Proyecto de verificación estructural - ENFOQUE ASCE"""
+    # Identificación
+    project_code: str
+    project_name: str
+    client: str
+    location: str
+    engineer: str
     
-    def add_product(self, product: Product) -> None:
-        """Agregar producto al proyecto"""
-        self.products[product.product_id] = product
-        product.parent_project = self
+    # Código de diseño
+    design_code: DesignCode = DesignCode.ASCE722
     
-    def remove_product(self, product_id: str) -> None:
-        """Remover producto del proyecto"""
-        if product_id in self.products:
-            del self.products[product_id]
+    # Casos de carga primarios
+    load_cases: List[LoadCase] = field(default_factory=list)
     
-    def save(self, filepath: Path) -> None:
-        """Guardar proyecto a JSON"""
-        data = {
-            "name": self.name,
-            "description": self.description,
-            "created_date": self.created_date.isoformat(),
-            "modified_date": datetime.now().isoformat(),
-            "project_folder": str(self.project_folder),
+    # Parámetros sísmicos
+    seismic_params: SeismicParameters = field(default_factory=SeismicParameters)
+    
+    # Parámetros de deriva
+    wind_drift: WindDriftParameters = field(default_factory=WindDriftParameters)
+    seismic_drift: SeismicDriftParameters = field(default_factory=SeismicDriftParameters)
+    
+    # NOTA: Las tablas de deflexión se movieron a Product
+    
+    # Metadata
+    created_date: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    modified_date: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    
+    def to_dict(self) -> Dict:
+        """Convertir a diccionario para JSON"""
+        return {
+            "project_code": self.project_code,
+            "project_name": self.project_name,
+            "client": self.client,
+            "location": self.location,
+            "engineer": self.engineer,
             "design_code": self.design_code.value,
-            "seismic_params": self._serialize_seismic_params() if self.seismic_params else None,
-            "wind_params": self._serialize_wind_params() if self.wind_params else None,
-            "load_case_mapping": self._serialize_load_cases(),
-            "deflection_limits": self._serialize_deflection_limits(),
-            "products": {pid: p.to_dict() for pid, p in self.products.items()}
-        }
-        
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-    
-    @classmethod
-    def load(cls, filepath: Path) -> 'Project':
-        """Cargar proyecto desde JSON - DESERIALIZACION COMPLETA"""
-        with open(filepath, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        # Crear proyecto base
-        project = cls(
-            name=data["name"],
-            description=data.get("description", ""),
-            project_folder=Path(data["project_folder"]),
-            design_code=DesignCode(data["design_code"])
-        )
-        
-        # Restaurar fechas
-        project.created_date = datetime.fromisoformat(data["created_date"])
-        project.modified_date = datetime.fromisoformat(data["modified_date"])
-        
-        # Restaurar parametros sismicos
-        if data.get("seismic_params"):
-            sp_data = data["seismic_params"]
-            project.seismic_params = SeismicParameters(
-                design_code=DesignCode(sp_data["design_code"]),
-                R_factor=sp_data["R_factor"],
-                Cd_factor=sp_data["Cd_factor"],
-                omega_factor=sp_data.get("omega_factor", 1.0),
-                q_factor=sp_data.get("q_factor"),
-                nu_factor=sp_data.get("nu_factor"),
-                seismic_cases=sp_data.get("seismic_cases", {}),
-                importance_factor=sp_data.get("importance_factor", 1.0),
-                drift_limits=[
-                    DriftLimit(
-                        story_height_m=dl["story_height_m"],
-                        drift_limit_percent=dl["drift_limit_percent"],
-                        code_reference=dl["code_reference"]
-                    )
-                    for dl in sp_data.get("drift_limits", [])
-                ]
-            )
-        
-        # Restaurar parametros de viento
-        if data.get("wind_params"):
-            wp_data = data["wind_params"]
-            project.wind_params = WindParameters(
-                wind_cases=wp_data.get("wind_cases", {}),
-                displacement_limit_h_over=wp_data.get("displacement_limit_h_over", 500.0),
-                code_reference=wp_data.get("code_reference", "")
-            )
-        
-        # Restaurar casos de carga
-        for key, lc_data in data.get("load_case_mapping", {}).items():
-            project.load_case_mapping[key] = LoadCaseMapping(
-                staad_case_number=lc_data["staad_case_number"],
-                staad_case_name=lc_data["staad_case_name"],
-                case_type=LoadCaseType(lc_data["case_type"]),
-                description=lc_data.get("description", "")
-            )
-        
-        # Restaurar limites de deflexion
-        for dl_data in data.get("deflection_limits", []):
-            project.deflection_limits.append(
-                DeflectionLimit(
-                    member_type=dl_data["member_type"],
-                    live_load_denominator=dl_data["live_load_denominator"],
-                    total_load_denominator=dl_data["total_load_denominator"],
-                    absolute_limit_mm=dl_data.get("absolute_limit_mm"),
-                    code_reference=dl_data.get("code_reference", "")
-                )
-            )
-        
-        # Restaurar productos
-        for pid, prod_data in data.get("products", {}).items():
-            product = Product(
-                product_id=prod_data["product_id"],
-                name=prod_data["name"],
-                description=prod_data.get("description", ""),
-                staad_file_path=Path(prod_data["staad_file_path"]),
-                last_analyzed=datetime.fromisoformat(prod_data["last_analyzed"]) if prod_data.get("last_analyzed") else None,
-                is_valid=prod_data.get("is_valid", False)
-            )
-            project.add_product(product)
-        
-        return project
-    
-    def _serialize_seismic_params(self) -> dict:
-        """Serializar parametros sismicos"""
-        return {
-            "design_code": self.seismic_params.design_code.value,
-            "R_factor": self.seismic_params.R_factor,
-            "Cd_factor": self.seismic_params.Cd_factor,
-            "omega_factor": self.seismic_params.omega_factor,
-            "q_factor": self.seismic_params.q_factor,
-            "nu_factor": self.seismic_params.nu_factor,
-            "seismic_cases": self.seismic_params.seismic_cases,
-            "importance_factor": self.seismic_params.importance_factor,
-            "drift_limits": [
+            "load_cases": [
                 {
-                    "story_height_m": dl.story_height_m,
-                    "drift_limit_percent": dl.drift_limit_percent,
-                    "code_reference": dl.code_reference
+                    "staad_number": lc.staad_number,
+                    "name": lc.name,
+                    "load_type": lc.load_type.value,
+                    "direction": lc.direction.value,
+                    "is_seismic_x": lc.is_seismic_x,
+                    "is_seismic_z": lc.is_seismic_z,
+                    "is_vertical_seismic": lc.is_vertical_seismic
                 }
-                for dl in self.seismic_params.drift_limits
-            ]
+                for lc in self.load_cases
+            ],
+            "seismic_params": {
+                "ss": self.seismic_params.ss,
+                "s1": self.seismic_params.s1,
+                "site_class": self.seismic_params.site_class.value,
+                "fa": self.seismic_params.fa,
+                "fv": self.seismic_params.fv,
+                "tl": self.seismic_params.tl,
+                "sms": self.seismic_params.sms,
+                "sm1": self.seismic_params.sm1,
+                "sds": self.seismic_params.sds,
+                "sd1": self.seismic_params.sd1,
+                "sdc": self.seismic_params.sdc
+            },
+            "wind_drift": {
+                "check_wind_drift": self.wind_drift.check_wind_drift,
+                "total_drift_denominator": self.wind_drift.total_drift_denominator,
+                "use_custom_total": self.wind_drift.use_custom_total,
+                "custom_total_mm": self.wind_drift.custom_total_mm,
+                "story_drift_denominator": self.wind_drift.story_drift_denominator,
+                "use_custom_story": self.wind_drift.use_custom_story,
+                "custom_story_mm": self.wind_drift.custom_story_mm
+            },
+            "seismic_drift": {
+                "risk_category": self.seismic_drift.risk_category.value,
+                "is_shear_wall": self.seismic_drift.is_shear_wall,
+                "is_risk_iii_iv": self.seismic_drift.is_risk_iii_iv,
+                "drift_limit": self.seismic_drift.drift_limit,
+                "cd_factor": self.seismic_drift.cd_factor,
+                "story_height_m": self.seismic_drift.story_height_m
+            },
+            "created_date": self.created_date,
+            "modified_date": self.modified_date
         }
-    
-    def _serialize_wind_params(self) -> dict:
-        """Serializar parametros de viento"""
-        return {
-            "wind_cases": self.wind_params.wind_cases,
-            "displacement_limit_h_over": self.wind_params.displacement_limit_h_over,
-            "code_reference": self.wind_params.code_reference
-        }
-    
-    def _serialize_load_cases(self) -> dict:
-        """Serializar mapeo de casos de carga"""
-        return {
-            key: {
-                "staad_case_number": lc.staad_case_number,
-                "staad_case_name": lc.staad_case_name,
-                "case_type": lc.case_type.value,
-                "description": lc.description
-            }
-            for key, lc in self.load_case_mapping.items()
-        }
-    
-    def _serialize_deflection_limits(self) -> list:
-        """Serializar limites de deflexion"""
-        return [
-            {
-                "member_type": dl.member_type,
-                "live_load_denominator": dl.live_load_denominator,
-                "total_load_denominator": dl.total_load_denominator,
-                "absolute_limit_mm": dl.absolute_limit_mm,
-                "code_reference": dl.code_reference
-            }
-            for dl in self.deflection_limits
-        ]
