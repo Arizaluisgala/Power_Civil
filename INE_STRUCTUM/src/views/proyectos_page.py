@@ -1,10 +1,16 @@
 ﻿"""
 INE-STRUCTUM - Página de Gestión de Proyectos
-VERSIÓN FINAL CON DIÁLOGOS FUNCIONALES
+VERSIÓN CON LÍNEAS GUÍA LIMITADAS (SIN ATRAVESAR EL GRÁFICO)
 """
 
 import flet as ft
 from datetime import datetime
+import io
+import base64
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
 
 STAAD_LOAD_TYPES = [
     "Dead", "Live", "Roof Live", "Wind", "Seismic-H", "Seismic-V",
@@ -51,6 +57,7 @@ class ProyectosPage:
         self.casos_de_carga = []
         self.form_modified = False
         self.current_overlay = None
+        self.espectro_image = None
         
         self.btn_nuevo = ft.ElevatedButton(
             "Nuevo Proyecto", 
@@ -90,18 +97,12 @@ class ProyectosPage:
         return self.main_stack
     
     def close_dialog(self):
-        """Cierra el diálogo actual"""
         if self.current_overlay and self.current_overlay in self.main_stack.controls:
             self.main_stack.controls.remove(self.current_overlay)
             self.current_overlay = None
             self.page.update()
     
     def show_custom_dialog(self, title, content, buttons_config):
-        """
-        buttons_config = [
-            {"text": "Texto", "on_click": funcion, "type": "elevated|outlined|text", "bgcolor": "#fff", "color": "#000", "icon": ft.Icons.SAVE}
-        ]
-        """
         def make_button_handler(callback):
             def handler(e):
                 self.close_dialog()
@@ -220,7 +221,6 @@ class ProyectosPage:
         self.page.update()
     
     def go_back_with_confirmation(self, e):
-        """Volver con confirmación"""
         if self.form_modified:
             content = ft.Text("Hay cambios en el formulario. ¿Deseas salir sin guardar?", size=14)
             buttons = [
@@ -230,6 +230,133 @@ class ProyectosPage:
             self.show_custom_dialog("⚠️ Cambios sin guardar", content, buttons)
         else:
             self.cancel_form(None)
+    
+    def generar_espectro_minimalista(self):
+        """Genera espectro con LÍNEAS GUÍA LIMITADAS (del punto al eje)"""
+        try:
+            ss = float(self.input_ss.value or 1.5)
+            s1 = float(self.input_s1.value or 0.6)
+            fa = float(self.input_fa.value or 1.0)
+            fv = float(self.input_fv.value or 1.5)
+            tl = float(self.input_tl.value or 8.0)
+            
+            sds = (2.0/3.0) * fa * ss
+            sd1 = (2.0/3.0) * fv * s1
+            t0 = 0.2 * (sd1 / sds) if sds > 0 else 0.0
+            ts = sd1 / sds if sds > 0 else 0.0
+            
+            # CALCULAR LÍMITE DINÁMICO DEL EJE X
+            t_max = max(tl * 1.3, 2.0)
+            
+            # Generar periodos hasta t_max
+            periodos = np.linspace(0.0, t_max, 500)
+            sa_values = []
+            
+            for t in periodos:
+                if t < t0:
+                    sa = sds * (0.4 + 0.6 * (t / t0))
+                elif t <= ts:
+                    sa = sds
+                elif t <= tl:
+                    sa = sd1 / t
+                else:
+                    sa = (sd1 * tl) / (t ** 2)
+                sa_values.append(sa)
+            
+            # CALCULAR LÍMITE DINÁMICO DEL EJE Y
+            sa_max = max(sa_values)
+            sa_limite = sa_max * 1.08
+            sa_tl = sd1 / tl if tl > 0 else 0
+            
+            # ESTILO MINIMALISTA
+            fig = plt.figure(figsize=(10, 5.5), facecolor='white')
+            ax = fig.add_subplot(111)
+            
+            # LÍNEAS GUÍA LIMITADAS (sin atravesar el gráfico)
+            guia_color = '#cbd5e1'
+            guia_style = (0, (3, 5))  # patrón de puntos
+            guia_width = 1.0
+            guia_alpha = 0.6
+            
+            # LÍNEAS VERTICALES (desde el punto hasta el eje X, es decir y=0)
+            ax.plot([t0, t0], [0, sds], color=guia_color, linestyle=guia_style, 
+                   linewidth=guia_width, alpha=guia_alpha, zorder=2)
+            ax.plot([ts, ts], [0, sds], color=guia_color, linestyle=guia_style, 
+                   linewidth=guia_width, alpha=guia_alpha, zorder=2)
+            ax.plot([tl, tl], [0, sa_tl], color=guia_color, linestyle=guia_style, 
+                   linewidth=guia_width, alpha=guia_alpha, zorder=2)
+            
+            # LÍNEAS HORIZONTALES (desde el punto hasta el eje Y, es decir x=0)
+            ax.plot([0, t0], [sds, sds], color=guia_color, linestyle=guia_style, 
+                   linewidth=guia_width, alpha=guia_alpha, zorder=2)
+            ax.plot([0, ts], [sds, sds], color=guia_color, linestyle=guia_style, 
+                   linewidth=guia_width, alpha=guia_alpha, zorder=2)
+            ax.plot([0, tl], [sa_tl, sa_tl], color=guia_color, linestyle=guia_style, 
+                   linewidth=guia_width, alpha=guia_alpha, zorder=2)
+            
+            # Curva principal
+            ax.plot(periodos, sa_values, linewidth=2.2, color='#334155', alpha=0.9, zorder=5)
+            
+            # Puntos característicos
+            ax.plot(t0, sds, 'o', markersize=7, color='#334155', markerfacecolor='white', 
+                   markeredgewidth=2, zorder=10, label=f'T₀={t0:.3f}s')
+            ax.plot(ts, sds, 's', markersize=7, color='#334155', markerfacecolor='white', 
+                   markeredgewidth=2, zorder=10, label=f'Ts={ts:.3f}s')
+            ax.plot(tl, sa_tl, 'd', markersize=7, color='#334155', markerfacecolor='white', 
+                   markeredgewidth=2, zorder=10, label=f'TL={tl:.1f}s')
+            
+            # Grid minimalista
+            ax.grid(True, linestyle='-', alpha=0.08, linewidth=0.8, color='#94a3b8', zorder=1)
+            ax.set_axisbelow(True)
+            
+            # Ejes y etiquetas
+            ax.set_xlabel('T (s)', fontsize=11, color='#475569', fontweight='500')
+            ax.set_ylabel('Sa (g)', fontsize=11, color='#475569', fontweight='500')
+            ax.set_title('Espectro de Diseño Elástico', fontsize=12, color='#1e293b', 
+                        fontweight='600', pad=15, loc='left')
+            
+            # Leyenda minimalista
+            legend = ax.legend(loc='upper right', fontsize=9, frameon=True, 
+                             fancybox=False, shadow=False, framealpha=0.95,
+                             edgecolor='#e2e8f0', facecolor='white')
+            legend.get_frame().set_linewidth(1)
+            
+            # LÍMITES AJUSTADOS DINÁMICAMENTE
+            ax.set_xlim(0, t_max)
+            ax.set_ylim(0, sa_limite)
+            
+            # Spines minimalistas
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_color('#cbd5e1')
+            ax.spines['bottom'].set_color('#cbd5e1')
+            ax.spines['left'].set_linewidth(1)
+            ax.spines['bottom'].set_linewidth(1)
+            
+            # Ticks sutiles
+            ax.tick_params(axis='both', which='major', labelsize=9, colors='#64748b', 
+                          length=4, width=1, direction='out')
+            
+            # Guardar
+            buf = io.BytesIO()
+            plt.tight_layout(pad=1.5)
+            plt.savefig(buf, format='png', dpi=130, bbox_inches='tight', 
+                       facecolor='white', edgecolor='none')
+            buf.seek(0)
+            plt.close()
+            
+            return base64.b64encode(buf.read()).decode('utf-8')
+            
+        except Exception as e:
+            print(f"Error: {e}")
+            return None
+    
+    def actualizar_espectro(self, e=None):
+        """Actualiza gráfico en tiempo real"""
+        img_base64 = self.generar_espectro_minimalista()
+        if img_base64 and self.espectro_image:
+            self.espectro_image.src_base64 = img_base64
+            self.page.update()
     
     def build_project_form(self, proyecto_data=None):
         is_edit = proyecto_data is not None
@@ -338,14 +465,25 @@ class ProyectosPage:
         self.page.update()
     
     def build_parametros_asce(self):
-        self.input_ss = ft.TextField(label="Ss (g) *", value="1.5", width=190, on_change=lambda e: setattr(self, 'form_modified', True))
-        self.input_s1 = ft.TextField(label="S1 (g) *", value="0.6", width=190, on_change=lambda e: setattr(self, 'form_modified', True))
-        self.input_fa = ft.TextField(label="Fa *", value="1.0", width=190, on_change=lambda e: setattr(self, 'form_modified', True))
-        self.input_fv = ft.TextField(label="Fv *", value="1.5", width=190, on_change=lambda e: setattr(self, 'form_modified', True))
-        self.input_tl = ft.TextField(label="TL (s) *", value="8.0", width=190, on_change=lambda e: setattr(self, 'form_modified', True))
+        # 8 CAMPOS ESENCIALES
+        self.input_ss = ft.TextField(label="Ss (g) *", value="1.5", width=190, on_change=lambda e: [setattr(self, 'form_modified', True), self.actualizar_espectro()])
+        self.input_s1 = ft.TextField(label="S1 (g) *", value="0.6", width=190, on_change=lambda e: [setattr(self, 'form_modified', True), self.actualizar_espectro()])
+        self.input_fa = ft.TextField(label="Fa *", value="1.0", width=190, on_change=lambda e: [setattr(self, 'form_modified', True), self.actualizar_espectro()])
+        self.input_fv = ft.TextField(label="Fv *", value="1.5", width=190, on_change=lambda e: [setattr(self, 'form_modified', True), self.actualizar_espectro()])
         
+        self.input_ie = ft.TextField(label="Ie *", value="1.0", width=190, on_change=lambda e: setattr(self, 'form_modified', True))
+        self.input_tl = ft.TextField(label="TL (s) *", value="8.0", width=190, on_change=lambda e: [setattr(self, 'form_modified', True), self.actualizar_espectro()])
         self.dropdown_site_class = ft.Dropdown(label="Site Class *", options=[ft.dropdown.Option(x) for x in ["A","B","C","D","E","F"]], value="D", width=190, on_change=lambda e: setattr(self, 'form_modified', True))
         self.dropdown_risk_category = ft.Dropdown(label="Risk Category *", options=[ft.dropdown.Option(x) for x in ["I","II","III","IV"]], value="II", width=190, on_change=lambda e: setattr(self, 'form_modified', True))
+        
+        # Generar espectro inicial
+        img_base64 = self.generar_espectro_minimalista()
+        self.espectro_image = ft.Image(
+            src_base64=img_base64,
+            width=850,
+            height=450,
+            fit=ft.ImageFit.CONTAIN
+        )
         
         if not self.casos_de_carga:
             self.casos_de_carga = [
@@ -363,14 +501,31 @@ class ProyectosPage:
             ft.Container(height=20),
             ft.Text("🔧 Configuración - ASCE 7-22", size=20, weight=ft.FontWeight.BOLD, color="#2563eb"),
             ft.Container(height=20),
+            
             ft.Text("⚠️ Parámetros Sísmicos del Sitio", size=16, weight=ft.FontWeight.BOLD, color="#475569"),
             ft.Container(height=15),
             ft.Row([self.input_ss, self.input_s1, self.input_fa, self.input_fv], spacing=15),
             ft.Container(height=10),
-            ft.Row([self.input_tl, self.dropdown_site_class, self.dropdown_risk_category], spacing=15),
+            ft.Row([self.input_ie, self.input_tl, self.dropdown_site_class, self.dropdown_risk_category], spacing=15),
+            
+            ft.Container(height=25),
+            ft.Divider(color="#e2e8f0"),
+            ft.Container(height=20),
+            
+            ft.Text("📊 Espectro de Diseño Elástico", size=16, weight=ft.FontWeight.BOLD, color="#475569"),
+            ft.Container(height=12),
+            ft.Container(
+                content=self.espectro_image,
+                bgcolor="#ffffff",
+                border_radius=8,
+                padding=15,
+                border=ft.border.all(1, "#e2e8f0")
+            ),
+            
             ft.Container(height=30),
             ft.Divider(color="#e2e8f0"),
             ft.Container(height=20),
+            
             ft.Text("📋 Casos de Carga Primarios", size=16, weight=ft.FontWeight.BOLD, color="#475569"),
             ft.Container(height=15),
             self.build_casos_de_carga_table(),
@@ -457,7 +612,6 @@ class ProyectosPage:
             self.page.update()
     
     def show_load_types_info(self, e):
-        """Muestra guía de tipos de carga"""
         text_lines = []
         for load_type in STAAD_LOAD_TYPES:
             desc = LOAD_TYPE_DESCRIPTIONS.get(load_type, "Sin descripción")
@@ -477,7 +631,6 @@ class ProyectosPage:
         self.page.update()
     
     def select_format_file(self, e):
-        """Abre diálogo para seleccionar archivo de plantilla"""
         self.form_modified = True
         
         def on_file_selected(e: ft.FilePickerResultEvent):
@@ -545,7 +698,3 @@ class ProyectosPage:
         self.page.overlay.append(snack)
         snack.open = True
         self.page.update()
-
-
-
-
